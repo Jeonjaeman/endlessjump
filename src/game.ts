@@ -123,6 +123,17 @@ export class Game {
       clearTimeout(this.resizeTimer);
       this.resizeTimer = window.setTimeout(() => this.resize(), 100);
     });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (this.audioCtx && this.audioCtx.state === 'running') {
+          this.audioCtx.suspend();
+        }
+      } else {
+        if (this.audioCtx && this.audioCtx.state === 'suspended' && this.bgmStarted) {
+          this.audioCtx.resume();
+        }
+      }
+    });
     this.resetGame();
     requestAnimationFrame((t) => this.loop(t));
   }
@@ -356,6 +367,9 @@ export class Game {
 
   private stopBGM(): void {
     this.bgmStarted = false;
+    if (this.audioCtx && this.audioCtx.state === 'running') {
+      this.audioCtx.suspend();
+    }
   }
 
   private playCarrotSound(): void {
