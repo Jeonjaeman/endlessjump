@@ -45,3 +45,12 @@ export interface ScorePopup {
   scale: number;
   color: string;
 }
+
+export interface RankEntry {
+  rank: number;
+  score: number;
+  height: number;
+  nickname: string;
+  country_code: string;
+  is_me: boolean;
+}

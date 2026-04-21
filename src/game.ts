@@ -1,4 +1,9 @@
-import { GameState, CarrotType, BunnyPose, type Carrot, type Particle, type Cloud, type ScorePopup } from './types';
+import { GameState, CarrotType, BunnyPose, type Carrot, type Particle, type Cloud, type ScorePopup, type RankEntry } from './types';
+import { initAuth, getLocalUUID, getLocalProfile } from './services/auth';
+import { submitScore } from './services/score';
+import { fetchRanking } from './services/leaderboard';
+import { renderRankingScreen, getTabHitArea } from './ui/ranking-screen';
+import { showProfileModal } from './ui/profile-modal';
 
 const GRAVITY = 0.6;
 const JUMP_VELOCITY = -15;
@@ -93,6 +98,12 @@ export class Game {
   private bgmGain: GainNode | null = null;
   private bgmStarted = false;
 
+  // Ranking state
+  private rankings: RankEntry[] = [];
+  private myRank: RankEntry | null = null;
+  private rankingTab: 'all' | 'weekly' = 'all';
+  private profileSet = false;
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     const ctx = canvas.getContext('2d');
@@ -100,6 +111,8 @@ export class Game {
     this.ctx = ctx;
     this.loadBest();
     this.setupEvents();
+    getLocalUUID();
+    initAuth();
   }
 
   private resizeTimer = 0;
@@ -468,6 +481,7 @@ export class Game {
         return;
       }
       if (this.state === GameState.GAME_OVER) {
+        if (this.handleTabTap(t.clientX, t.clientY)) return;
         this.resetGame();
         this.state = GameState.START;
         return;
@@ -499,6 +513,7 @@ export class Game {
         return;
       }
       if (this.state === GameState.GAME_OVER) {
+        if (this.handleTabTap(e.clientX, e.clientY)) return;
         this.resetGame();
         this.state = GameState.START;
         return;
@@ -697,6 +712,27 @@ export class Game {
     this.state = GameState.GAME_OVER;
     this.saveBest();
     this.stopBGM();
+
+    // Prompt profile setup on first game over
+    if (!this.profileSet) {
+      this.profileSet = true;
+      const profile = getLocalProfile();
+      if (profile.nickname === 'Bunny') {
+        showProfileModal();
+      }
+    }
+
+    // Submit score & fetch rankings
+    const heightMm = Math.floor(this.heightReached);
+    submitScore({ score: this.score, height: heightMm });
+    this.rankingTab = 'all';
+    this.loadRankings();
+  }
+
+  private async loadRankings(): Promise<void> {
+    const entries = await fetchRanking(this.rankingTab);
+    this.rankings = entries.filter(e => e.rank <= 10);
+    this.myRank = entries.find(e => e.is_me && e.rank > 10) || null;
   }
 
   private worldToScreen(worldY: number): number {
@@ -1309,7 +1345,7 @@ export class Game {
     ctx.textAlign = 'center';
     ctx.shadowColor = 'rgba(0,0,0,0.4)';
     ctx.shadowBlur = 8;
-    ctx.fillText('BunnyHop', this.w / 2, this.h / 3);
+    ctx.fillText('무한의당근', this.w / 2, this.h / 3);
     ctx.shadowBlur = 0;
 
     ctx.font = '20px sans-serif';
@@ -1323,29 +1359,33 @@ export class Game {
     }
   }
 
+  private handleTabTap(x: number, y: number): boolean {
+    const { allTab, weeklyTab } = getTabHitArea(this.w, this.h);
+    if (x >= allTab.x && x <= allTab.x + allTab.width &&
+        y >= allTab.y && y <= allTab.y + allTab.height) {
+      if (this.rankingTab !== 'all') {
+        this.rankingTab = 'all';
+        this.loadRankings();
+      }
+      return true;
+    }
+    if (x >= weeklyTab.x && x <= weeklyTab.x + weeklyTab.width &&
+        y >= weeklyTab.y && y <= weeklyTab.y + weeklyTab.height) {
+      if (this.rankingTab !== 'weekly') {
+        this.rankingTab = 'weekly';
+        this.loadRankings();
+      }
+      return true;
+    }
+    return false;
+  }
+
   private renderGameOverScreen(ctx: CanvasRenderingContext2D): void {
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(0, 0, this.w, this.h);
-
-    ctx.fillStyle = '#FF4444';
-    ctx.font = 'bold 32px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.shadowColor = 'rgba(0,0,0,0.5)';
-    ctx.shadowBlur = 6;
-    ctx.fillText('Game Over!', this.w / 2, this.h / 3);
-    ctx.shadowBlur = 0;
-
-    ctx.fillStyle = '#FFF';
-    ctx.font = '22px sans-serif';
-    ctx.fillText(`Score: ${this.score}`, this.w / 2, this.h / 3 + 50);
-    ctx.fillText(`Height: ${Math.floor(this.heightReached)}mm`, this.w / 2, this.h / 3 + 80);
-
-    ctx.fillStyle = '#FFD700';
-    ctx.font = '16px sans-serif';
-    ctx.fillText(`Best: ${this.bestScore} pts / ${this.bestHeight}mm`, this.w / 2, this.h / 3 + 120);
-
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.font = '18px sans-serif';
-    ctx.fillText('Tap to Restart', this.w / 2, this.h / 3 + 170);
+    renderRankingScreen(
+      ctx, this.w, this.h,
+      this.rankings, this.myRank, this.rankingTab,
+      this.score, Math.floor(this.heightReached),
+      this.bestScore, this.bestHeight,
+    );
   }
 }
