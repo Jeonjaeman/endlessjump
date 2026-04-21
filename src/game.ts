@@ -722,11 +722,15 @@ export class Game {
       }
     }
 
-    // Submit score & fetch rankings
+    // Submit score first, then fetch rankings
     const heightMm = Math.floor(this.heightReached);
-    submitScore({ score: this.score, height: heightMm });
     this.rankingTab = 'all';
-    this.loadRankings();
+    this.submitAndLoadRankings(heightMm);
+  }
+
+  private async submitAndLoadRankings(heightMm: number): Promise<void> {
+    await submitScore({ score: this.score, height: heightMm });
+    await this.loadRankings();
   }
 
   private async loadRankings(): Promise<void> {

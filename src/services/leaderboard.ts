@@ -22,10 +22,6 @@ export async function fetchRanking(mode: 'all' | 'weekly'): Promise<RankEntry[]>
   if (!sb) return [];
 
   try {
-    const timeFilter = mode === 'weekly'
-      ? `AND s.played_at >= date_trunc('week', now())`
-      : '';
-
     const { data, error } = await sb.rpc('get_ranking', {
       p_user_id: userId,
       p_mode: mode,
