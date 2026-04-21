@@ -1,5 +1,5 @@
 import { GameState, CarrotType, BunnyPose, type Carrot, type Particle, type Cloud, type ScorePopup, type RankEntry } from './types';
-import { initAuth, getLocalUUID, getLocalProfile } from './services/auth';
+import { initAuth, getLocalUUID } from './services/auth';
 import { submitScore } from './services/score';
 import { fetchRanking } from './services/leaderboard';
 import { renderRankingScreen, getTabHitArea } from './ui/ranking-screen';
@@ -102,7 +102,6 @@ export class Game {
   private rankings: RankEntry[] = [];
   private myRank: RankEntry | null = null;
   private rankingTab: 'all' | 'weekly' = 'all';
-  private profileSet = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -727,13 +726,10 @@ export class Game {
     this.saveBest();
     this.stopBGM();
 
-    // Prompt profile setup on first game over
-    if (!this.profileSet) {
-      this.profileSet = true;
-      const profile = getLocalProfile();
-      if (profile.nickname === 'Bunny') {
-        showProfileModal();
-      }
+    // Prompt profile setup once (persisted to localStorage)
+    if (!localStorage.getItem('bh_profile_set')) {
+      localStorage.setItem('bh_profile_set', '1');
+      showProfileModal();
     }
 
     // Submit score first, then fetch rankings

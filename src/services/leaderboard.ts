@@ -23,7 +23,7 @@ export async function fetchRanking(mode: 'all' | 'weekly'): Promise<RankEntry[]>
 
   try {
     const { data, error } = await sb.rpc('get_ranking', {
-      p_user_id: userId,
+      p_user_id: userId || '00000000-0000-0000-0000-000000000000',
       p_mode: mode,
     });
 

@@ -20,7 +20,11 @@ export function renderRankingScreen(
   ctx.fillRect(0, 0, w, h);
 
   const cx = w / 2;
-  const startY = h * 0.02;
+
+  // Calculate total content height to center vertically
+  // Title(30) + gap(10) + score(22) + height(18) + best(16) + gap(12) + tabs(30) + gap(14) + 10 rows(320) + restart(30) ≈ 502
+  const contentH = 500;
+  const startY = Math.max(10, (h - contentH) / 2 - 20);
 
   // Game Over title — centered
   ctx.fillStyle = '#FF4444';
@@ -33,20 +37,20 @@ export function renderRankingScreen(
 
   // Current score — centered block
   ctx.fillStyle = '#FFF';
-  ctx.font = 'bold 22px sans-serif';
-  ctx.fillText(`${score}`, cx, startY + 62);
+  ctx.font = 'bold 24px sans-serif';
+  ctx.fillText(`Score: ${score}`, cx, startY + 66);
 
   ctx.fillStyle = 'rgba(255,255,255,0.6)';
   ctx.font = '14px sans-serif';
-  ctx.fillText(`Height: ${heightMm}mm`, cx, startY + 82);
+  ctx.fillText(`Height: ${heightMm}mm`, cx, startY + 86);
 
   // Best score
   ctx.fillStyle = '#FFD700';
   ctx.font = '13px sans-serif';
-  ctx.fillText(`Best: ${bestScore} pts / ${bestHeight}mm`, cx, startY + 100);
+  ctx.fillText(`Best: ${bestScore} pts / ${bestHeight}mm`, cx, startY + 106);
 
   // Tab buttons
-  const tabY = startY + 112;
+  const tabY = startY + 120;
   const tabW = 90;
   const tabH = 30;
   const tabGap = 10;
@@ -157,8 +161,9 @@ export function renderRankingScreen(
 
 export function getTabHitArea(w: number, h: number): { allTab: DOMRect; weeklyTab: DOMRect } {
   const cx = w / 2;
-  const startY = h * 0.02;
-  const tabY = startY + 112;
+  const contentH = 500;
+  const startY = Math.max(10, (h - contentH) / 2 - 20);
+  const tabY = startY + 120;
   const tabW = 90;
   const tabH = 30;
   const tabGap = 10;
