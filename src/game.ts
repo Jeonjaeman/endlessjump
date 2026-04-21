@@ -531,8 +531,16 @@ export class Game {
         // 아직 당근이 아래에 있음 - 원래 속도로 추락
         this.velY = Math.min(this.velY + GRAVITY, MAX_FALL_SPEED);
       } else {
-        // 당근이 정말로 없음 - 빠르게 착지
-        this.velY = Math.min(this.velY + GRAVITY * 6, MAX_FALL_SPEED * 2);
+        // 당근이 정말로 없음 - 높이에 비례하여 급속 낙하
+        const fallDist = this.groundY - this.bunnyY;
+        if (fallDist > 3000) {
+          // 높은 곳에서 당근 없이 추락 → 즉시 게임 오버
+          this.bunnyY = this.groundY - BUNNY_RADIUS;
+          this.hasJumped = false;
+          this.gameOver();
+          return;
+        }
+        this.velY = Math.min(this.velY + GRAVITY * 6, MAX_FALL_SPEED * 4);
       }
     } else {
       // 상승 중
