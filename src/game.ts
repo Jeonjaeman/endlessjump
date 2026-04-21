@@ -95,14 +95,21 @@ export class Game {
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d')!;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas 2D context not supported');
+    this.ctx = ctx;
     this.loadBest();
     this.setupEvents();
   }
 
+  private resizeTimer = 0;
+
   start(): void {
     this.resize();
-    window.addEventListener('resize', () => this.resize());
+    window.addEventListener('resize', () => {
+      clearTimeout(this.resizeTimer);
+      this.resizeTimer = window.setTimeout(() => this.resize(), 100);
+    });
     this.resetGame();
     requestAnimationFrame((t) => this.loop(t));
   }
@@ -136,10 +143,10 @@ export class Game {
     this.animTime = 0;
     this.particles = [];
     this.scorePopups = [];
-    this.scoreBounce = 0;
+    this.scoreBounce = 1.0;
     this.scoreColor = '#FFF';
     this.poolTopY = 0;
-    this.lastTime = 0;
+    this.lastTime = performance.now();
     this.generateInitialCarrotPool();
     this.generateClouds();
     this.startTime = performance.now();
@@ -254,9 +261,13 @@ export class Game {
   }
 
   private startBGM(): void {
-    if (!this.audioCtx || !this.bgmGain || this.bgmStarted) return;
-    this.bgmStarted = true;
-    this.scheduleBGMLoop();
+    if (!this.audioCtx || !this.bgmGain) return;
+    // Stop any previous loop before starting fresh
+    this.bgmStarted = false;
+    setTimeout(() => {
+      this.bgmStarted = true;
+      this.scheduleBGMLoop();
+    }, 50);
   }
 
   private scheduleBGMLoop(): void {
@@ -579,6 +590,9 @@ export class Game {
 
     for (const c of this.carrots) {
       if (c.eaten) continue;
+      // Only collide when bunny is falling (velY > 0) and approaching from above
+      if (this.velY <= 0) continue;
+      if (this.bunnyY > c.y + CARROT_HIT_RADIUS) continue;
       const dx = this.bunnyX - c.x;
       const dy = this.bunnyY - c.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
