@@ -45,19 +45,9 @@ let InterstitialAdEvents: any = null;
 let RewardAdEvents: any = null;
 
 async function loadAdMobPlugin(): Promise<boolean> {
-  if (!isNative) return false;
-  try {
-    const mod = await import('@capacitor-community/admob');
-    AdMobPlugin = mod.AdMob;
-    BannerAdSizeEnum = mod.BannerAdSize;
-    BannerAdPositionEnum = mod.BannerAdPosition;
-    InterstitialAdEvents = mod.InterstitialAdPluginEvents;
-    RewardAdEvents = mod.RewardAdPluginEvents;
-    return true;
-  } catch {
-    console.warn('[AdService] Failed to load @capacitor-community/admob');
-    return false;
-  }
+  // AdMob 플러그인 일시 비활성화 — 앱 안정성 확보 후 재활성화
+  console.log('[AdService] AdMob 플러그인 비활성화 (스텁 모드)');
+  return false;
 }
 
 // -- State --
