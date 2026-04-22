@@ -594,14 +594,14 @@ export class Game {
 
     // 추락 중 중력 조절
     if (this.velY > 0) {
-      const hasCarrotBelow = this.carrots.some(c =>
+      const hasCarrotNearby = this.carrots.some(c =>
         !c.eaten &&
-        c.y > this.bunnyY &&
+        c.y > this.bunnyY - NORMAL_JUMP_PEAK * 0.3 &&
         c.y - this.bunnyY <= MAX_CARROT_BELOW
       );
 
-      if (hasCarrotBelow) {
-        // 아직 당근이 아래에 있음 - 원래 속도로 추락
+      if (hasCarrotNearby) {
+        // 도달 가능한 당근이 있음 - 원래 속도로 추락
         this.velY = Math.min(this.velY + GRAVITY, MAX_FALL_SPEED);
       } else {
         // 당근이 정말로 없음 - 높이에 비례하여 급속 낙하
@@ -672,11 +672,14 @@ export class Game {
 
     for (const c of this.carrots) {
       if (c.eaten) continue;
-      // Only collide when bunny is falling (velY > 0) and approaching from above
-      if (this.velY <= 0) continue;
+      // 낙하 중이거나 점프 정점 근처에서만 충돌 (강하게 상승 중에는 통과)
+      if (this.velY < -2) continue;
+      // 토끼가 당근보다 너무 아래이면 무시
       if (this.bunnyY > c.y + CARROT_HIT_RADIUS) continue;
       const dx = this.bunnyX - c.x;
-      const dy = this.bunnyY - c.y;
+      // 충돌 판정은 토끼 발 위치(중심 + 반지름의 절반) 기준
+      const feetY = this.bunnyY + BUNNY_RADIUS * 0.5;
+      const dy = feetY - c.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist < BUNNY_RADIUS + CARROT_HIT_RADIUS) {
         c.eaten = true;
