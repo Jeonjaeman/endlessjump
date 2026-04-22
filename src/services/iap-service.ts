@@ -55,19 +55,14 @@ const DEFAULT_PRODUCTS: IAPProduct[] = [
   },
 ];
 
-// ── RevenueCat 동적 import ───────────────────────────────────
+// ── IAP 플러그인 (추후 호환 플러그인 설치 시 활성화) ──────────
 let Purchases: any = null;
 
 async function loadPurchasesPlugin(): Promise<boolean> {
-  if (!isNative) return false;
-  try {
-    const mod = await import('@capgo/capacitor-purchases');
-    Purchases = mod.Purchases;
-    return true;
-  } catch {
-    console.warn('[IAPService] @capgo/capacitor-purchases를 로드할 수 없습니다.');
-    return false;
-  }
+  // @capgo/capacitor-purchases는 Capacitor 8 미지원으로 제거됨
+  // 호환 플러그인 설치 후 여기에 dynamic import 추가
+  console.log('[IAPService] IAP 플러그인 미설치 — 스텁 모드');
+  return false;
 }
 
 // ── 상태 ────────────────────────────────────────────────────
