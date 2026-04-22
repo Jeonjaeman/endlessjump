@@ -1,4 +1,4 @@
-package com.bunnyhop.game;
+package kr.tengtengsoft.bunnyhop;
 
 import com.getcapacitor.BridgeActivity;
 
