@@ -22,10 +22,11 @@ export function renderRankingScreen(
 
   const cx = w / 2;
 
+  // Safe area padding (상태바/노치 영역 회피)
+  const safeTop = 40;
   // Calculate total content height to center vertically
-  // Title(30) + gap(10) + score(22) + height(18) + best(16) + gap(12) + tabs(30) + gap(14) + 10 rows(320) + restart(30) ≈ 502
   const contentH = 500;
-  const startY = Math.max(10, (h - contentH) / 2 - 20);
+  const startY = Math.max(safeTop, (h - contentH) / 2);
 
   // Game Over title — centered
   ctx.fillStyle = '#FF4444';
