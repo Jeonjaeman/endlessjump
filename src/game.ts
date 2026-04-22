@@ -391,6 +391,10 @@ export class Game {
 
   private stopBGM(): void {
     this.bgmStarted = false;
+    if (this.bgmTimeout) {
+      clearTimeout(this.bgmTimeout);
+      this.bgmTimeout = null;
+    }
     if (this.audioCtx && this.audioCtx.state === 'running') {
       this.audioCtx.suspend();
     }
@@ -805,7 +809,9 @@ export class Game {
         await showProfileModal();
       }
       await this.submitAndLoadRankings(heightMm);
-    })();
+    })().catch((e) => {
+      console.warn('[Game] 점수 제출/랭킹 로드 실패:', e);
+    });
   }
 
   private async submitAndLoadRankings(heightMm: number): Promise<void> {
