@@ -6,8 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   plugins: {
     AdMob: {
-      // Google 공식 테스트 App ID (프로덕션 전에 실제 ID로 교체)
-      androidApplicationId: 'ca-app-pub-3940256099942544~3347511713',
+      androidApplicationId: 'ca-app-pub-7981513411030364~1063972710',
     },
   },
 };
