@@ -1,0 +1,254 @@
+
+  private render(): void {
+    const ctx = this.ctx;
+    const shakeX = this.shakeTimer > 0 ? rand(-3, 3) : 0;
+    const shakeY = this.shakeTimer > 0 ? rand(-3, 3) : 0;
+
+    ctx.save();
+    ctx.translate(shakeX, shakeY);
+
+    this.renderBackground(ctx);
+    this.renderClouds3D(ctx);
+
+    if (this.state === GameState.PLAYING) {
+      this.renderGround3D(ctx);
+      this.renderCarrots3D(ctx);
+      this.renderBunny3D(ctx, this.bunnyX, this.h / 2);
+      this.renderParticles(ctx);
+      this.renderHUD(ctx);
+    } else if (this.state === GameState.START) {
+      this.renderGround3D(ctx);
+      this.renderCarrots3D(ctx);
+      this.renderBunny3D(ctx, this.w / 2, this.worldToScreen(this.groundY - BUNNY_RADIUS - 10));
+      this.renderStartScreen(ctx);
+    } else if (this.state === GameState.GAME_OVER) {
+      this.renderGround3D(ctx);
+      this.renderCarrots3D(ctx);
+      this.renderBunny3D(ctx, this.bunnyX, this.worldToScreen(this.bunnyY));
+      this.renderGameOverScreen(ctx);
+      renderShopButton(ctx, this.w, this.h);
+    }
+
+    // 상점 오버레이 (모든 상태 위에)
+    if (isShopOpen()) {
+      renderShop(ctx, this.w, this.h);
+    }
+
+    // 업적 달성 팝업 (최상위)
+    renderAchievementPopup(ctx, this.w, this.h);
+
+    ctx.restore();
+  }
+
+  private getSkyColors(): [string, string] {
+    const elapsed = this.state === GameState.PLAYING
+      ? (performance.now() - this.startTime)
+      : 0;
+    const cycle = (elapsed % DAY_CYCLE_MS) / DAY_CYCLE_MS;
+
+    if (cycle < 0.25) {
+      const t = cycle / 0.25;
+      return [lerpColor('#87CEEB', '#FF8C42', t), lerpColor('#E0F0FF', '#FFB366', t)];
+    } else if (cycle < 0.5) {
+      const t = (cycle - 0.25) / 0.25;
+      return [lerpColor('#FF8C42', '#1a1a3e', t), lerpColor('#FFB366', '#2d2d6b', t)];
+    } else if (cycle < 0.75) {
+      const t = (cycle - 0.5) / 0.25;
+      return [lerpColor('#1a1a3e', '#2d4a7a', t), lerpColor('#2d2d6b', '#87CEEB', t)];
+    } else {
+      const t = (cycle - 0.75) / 0.25;
+      return [lerpColor('#2d4a7a', '#87CEEB', t), lerpColor('#87CEEB', '#E0F0FF', t)];
+    }
+  }
+
+  private renderBackground(ctx: CanvasRenderingContext2D): void {
+    const [top, bottom] = this.getSkyColors();
+    const grad = ctx.createLinearGradient(0, 0, 0, this.h);
+    grad.addColorStop(0, top);
+    grad.addColorStop(1, bottom);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, this.w, this.h);
+  }
+
+  private renderClouds3D(ctx: CanvasRenderingContext2D): void {
+    for (const cl of this.clouds) {
+      const screenY = this.worldToScreen(cl.y) * cl.z + (1 - cl.z) * this.h * 0.3;
+      if (screenY < -200 || screenY > this.h + 200) continue;
+
+      const scale = 0.5 + cl.z * 0.5;
+      const cw = cl.width * scale;
+      const ch = cw * 0.35;
+
+      ctx.save();
+      ctx.globalAlpha = cl.opacity * (0.5 + cl.z * 0.5);
+
+      const grd = ctx.createRadialGradient(cl.x, screenY, 0, cl.x, screenY, cw / 2);
+      grd.addColorStop(0, 'rgba(255,255,255,0.9)');
+      grd.addColorStop(0.6, 'rgba(255,255,255,0.4)');
+      grd.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = grd;
+
+      ctx.beginPath();
+      ctx.ellipse(cl.x, screenY, cw / 2, ch / 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.ellipse(cl.x - cw * 0.22, screenY + ch * 0.15, cw * 0.3, ch * 0.35, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(cl.x + cw * 0.22, screenY + ch * 0.15, cw * 0.3, ch * 0.35, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.globalAlpha = cl.opacity * 0.15 * cl.z;
+      ctx.fillStyle = '#8899aa';
+      ctx.beginPath();
+      ctx.ellipse(cl.x, screenY + ch * 0.4, cw * 0.4, ch * 0.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+  }
+
+  private renderGround3D(ctx: CanvasRenderingContext2D): void {
+    const gy = this.worldToScreen(this.groundY);
+    if (gy > this.h + 200) return;
+
+    const blockH = 20;
+    const rows = 8;
+
+    for (let i = 0; i < rows; i++) {
+      const rowY = gy + i * blockH;
+      if (rowY > this.h + blockH) break;
+
+      const depth = i / rows;
+      const baseR = 126 - depth * 40;
+      const baseG = 200 - depth * 50;
+      const baseB = 80 - depth * 30;
+
+      const topColor = `rgb(${baseR},${baseG},${baseB})`;
+      const botColor = `rgb(${baseR * 0.7},${baseG * 0.7},${baseB * 0.7})`;
+
+      const grad = ctx.createLinearGradient(0, rowY, 0, rowY + blockH);
+      grad.addColorStop(0, topColor);
+      grad.addColorStop(1, botColor);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, rowY, this.w, blockH + 1);
+
+      if (i === 0) {
+        const grassGrad = ctx.createLinearGradient(0, rowY - 6, 0, rowY + 4);
+        grassGrad.addColorStop(0, '#8ED860');
+        grassGrad.addColorStop(1, '#5A9A32');
+        ctx.fillStyle = grassGrad;
+        ctx.fillRect(0, rowY - 3, this.w, 7);
+      }
+
+      ctx.strokeStyle = `rgba(0,0,0,${0.05 + depth * 0.08})`;
+      ctx.lineWidth = 1;
+      const blockW = 40 + i * 5;
+      const offset = (i % 2) * blockW * 0.5;
+      for (let bx = -blockW + offset; bx < this.w + blockW; bx += blockW) {
+        ctx.strokeRect(bx, rowY, blockW, blockH);
+      }
+    }
+
+    ctx.fillStyle = `rgb(${126 - 40},${200 - 50},${80 - 30})`;
+    ctx.fillRect(0, gy + rows * blockH, this.w, this.h);
+  }
+
+  private renderCarrots3D(ctx: CanvasRenderingContext2D): void {
+    for (const c of this.carrots) {
+      if (c.eaten) continue;
+      const sy = this.worldToScreen(c.y);
+      if (sy < -60 || sy > this.h + 60) continue;
+
+      const scale = this.perspectiveScale(c.y);
+
+      if (c.type === CarrotType.NORMAL) {
+        this.drawCarrot3D(ctx, c.x, sy, scale, '#FF6B35', '#E85520', '#4CAF50', '#388E3C', false);
+      } else if (c.type === CarrotType.SPECIAL) {
+        this.drawCarrot3D(ctx, c.x, sy, scale, '#FFD700', '#E6B800', '#90EE90', '#5CBF5C', true);
+      }
+    }
+  }
+
+  private drawCarrot3D(
+    ctx: CanvasRenderingContext2D,
+    x: number, y: number, scale: number,
+    bodyLight: string, bodyDark: string,
+    leafLight: string, leafDark: string,
+    glow: boolean
+  ): void {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+
+    if (glow) {
+      const glowGrad = ctx.createRadialGradient(0, 0, 5, 0, 0, 28);
+      glowGrad.addColorStop(0, 'rgba(255, 215, 0, 0.4)');
+      glowGrad.addColorStop(1, 'rgba(255, 215, 0, 0)');
+      ctx.fillStyle = glowGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, 28, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.beginPath();
+    ctx.ellipse(2, 16, 8, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const bodyGrad = ctx.createLinearGradient(-8, -8, 8, 14);
+    bodyGrad.addColorStop(0, bodyLight);
+    bodyGrad.addColorStop(0.6, bodyDark);
+    bodyGrad.addColorStop(1, bodyLight);
+    ctx.fillStyle = bodyGrad;
+
+    ctx.beginPath();
+    ctx.moveTo(-9, -8);
+    ctx.quadraticCurveTo(-10, 2, -3, 16);
+    ctx.lineTo(3, 16);
+    ctx.quadraticCurveTo(10, 2, 9, -8);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.beginPath();
+    ctx.moveTo(-6, -6);
+    ctx.quadraticCurveTo(-7, 2, -2, 12);
+    ctx.lineTo(-1, 12);
+    ctx.quadraticCurveTo(-4, 2, -3, -6);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+    ctx.lineWidth = 0.5;
+    for (let i = 1; i <= 3; i++) {
+      const ly = -6 + i * 5;
+      ctx.beginPath();
+      ctx.moveTo(-8 + i, ly);
+      ctx.lineTo(8 - i, ly);
+      ctx.stroke();
+    }
+
+    const leaves = [
+      { angle: -0.4, len: 12 },
+      { angle: 0, len: 14 },
+      { angle: 0.4, len: 12 },
+    ];
+    for (const leaf of leaves) {
+      const leafGrad = ctx.createLinearGradient(0, -10, 0, -10 - leaf.len);
+      leafGrad.addColorStop(0, leafDark);
+      leafGrad.addColorStop(1, leafLight);
+      ctx.fillStyle = leafGrad;
+
+      ctx.save();
+      ctx.translate(0, -9);
+      ctx.rotate(leaf.angle);
+      ctx.beginPath();
+      ctx.ellipse(0, -leaf.len / 2, 3, leaf.len / 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }

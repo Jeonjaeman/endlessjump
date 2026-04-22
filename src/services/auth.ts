@@ -1,4 +1,5 @@
 import { getSupabase } from './supabase';
+import { flushQueue } from './offline-queue';
 
 const LOCAL_UUID_KEY = 'bh_local_uuid';
 const PROFILE_KEY = 'bh_profile';
@@ -49,6 +50,8 @@ export async function initAuth(): Promise<string | null> {
     if (session?.user) {
       supabaseUserId = session.user.id;
       await ensureProfile();
+      // 기존 세션 복원 시에도 오프라인 큐 플러시
+      flushQueue();
       return supabaseUserId;
     }
 
@@ -58,6 +61,8 @@ export async function initAuth(): Promise<string | null> {
 
     supabaseUserId = data.user.id;
     await ensureProfile();
+    // 앱 시작 시 오프라인 큐 플러시
+    flushQueue();
     return supabaseUserId;
   } catch {
     return null;

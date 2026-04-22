@@ -1,0 +1,295 @@
+import { GameState, CarrotType, BunnyPose, type Carrot, type Particle, type Cloud, type ScorePopup, type RankEntry, type SkinColors } from './types';
+import { initAuth, getLocalUUID } from './services/auth';
+import { submitScore } from './services/score';
+import { fetchRanking, invalidateCache } from './services/leaderboard';
+import { renderRankingScreen, getTabHitArea, getReviveHitArea } from './ui/ranking-screen';
+import { showProfileModal } from './ui/profile-modal';
+import { initAds, showBanner, hideBanner, showInterstitialOnGameOver, isRewardedReady, showRewardedAd, areAdsRemoved } from './services/ad-service';
+import { initIAP } from './services/iap-service';
+import { initSkins, getCurrentSkinColors } from './services/skin-service';
+import { initAchievements, onGameOver as achOnGameOver, onCarrotEaten as achOnCarrotEaten, popRecentlyCompleted } from './services/achievement-service';
+import { isShopOpen, openShop, closeShop, handleShopTap, renderShop, renderShopButton, getShopButtonArea, renderAchievementPopup, queueAchievementPopup, clearAchievementPopups } from './ui/shop-screen';
+
+const GRAVITY = 0.6;
+const JUMP_VELOCITY = -15;
+const MAX_FALL_SPEED = 12;
+const BUNNY_RADIUS = 18;
+const CARROT_RADIUS = 14;
+const CARROT_HIT_RADIUS = 22;
+const DAY_CYCLE_MS = 120_000;
+const CAMERA_LERP = 0.08;
+const CARROT_FALL_SPEED = 0.4;
+const MAX_CARROT_BELOW = 2000;
+const NORMAL_JUMP_PEAK = JUMP_VELOCITY ** 2 / (2 * GRAVITY); // ~187.5
+const GOLDEN_JUMP_PEAK = (JUMP_VELOCITY * 2) ** 2 / (2 * GRAVITY); // ~750
+const PRELOAD_HEIGHT_MULTIPLIER = 3;
+
+interface HeightZone {
+  minGap: number;
+  maxGap: number;
+  specialChance: number;
+}
+
+function getZone(height: number): HeightZone {
+  if (height < 500) return { minGap: 30, maxGap: 50, specialChance: 0.15 };
+  if (height < 1000) return { minGap: 40, maxGap: 60, specialChance: 0.15 };
+  if (height < 1500) return { minGap: 50, maxGap: 80, specialChance: 0.17 };
+  if (height < 3000) return { minGap: 80, maxGap: 120, specialChance: 0.19 };
+  if (height < 5000) return { minGap: 120, maxGap: 180, specialChance: 0.21 };
+  if (height < 8000) return { minGap: 180, maxGap: 250, specialChance: 0.23 };
+  return { minGap: 250, maxGap: 350, specialChance: 0.25 };
+}
+
+function rand(min: number, max: number): number {
+  return min + Math.random() * (max - min);
+}
+
+function lerpColor(a: string, b: string, t: number): string {
+  const pa = hexToRgb(a);
+  const pb = hexToRgb(b);
+  const r = Math.round(pa.r + (pb.r - pa.r) * t);
+  const g = Math.round(pa.g + (pb.g - pa.g) * t);
+  const bl = Math.round(pa.b + (pb.b - pa.b) * t);
+  return `rgb(${r},${g},${bl})`;
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const n = parseInt(hex.slice(1), 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function clamp(v: number, min: number, max: number): number {
+  return v < min ? min : v > max ? max : v;
+}
+
+export class Game {
+  private readonly canvas: HTMLCanvasElement;
+  private readonly ctx: CanvasRenderingContext2D;
+  private w = 0;
+  private h = 0;
+
+  private state: GameState = GameState.START;
+  private bunnyX = 0;
+  private bunnyY = 0;
+  private velX = 0;
+  private velY = 0;
+  private cameraY = 0;
+  private targetCameraY = 0;
+  private score = 0;
+  private bestScore = 0;
+  private bestHeight = 0;
+  private heightReached = 0;
+  private groundY = 0;
+  private startTime = 0;
+
+  private carrots: Carrot[] = [];
+  private particles: Particle[] = [];
+  private clouds: Cloud[] = [];
+  private shakeTimer = 0;
+  private bunnyPose: BunnyPose = BunnyPose.IDLE;
+  private earBounce = 0;
+  private animTime = 0;
+
+  private touching = false;
+  private touchX = 0;
+  private hasJumped = false;
+  private goldenBuffActive = false;
+  private poolTopY = 0;
+  private scorePopups: ScorePopup[] = [];
+  private scoreBounce = 0;
+  private scoreColor = '#FFF';
+
+  private audioCtx: AudioContext | null = null;
+  private bgmGain: GainNode | null = null;
+  private bgmStarted = false;
+  private bgmTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  // Ranking state
+  private rankings: RankEntry[] = [];
+  private myRank: RankEntry | null = null;
+  private rankingTab: 'all' | 'weekly' = 'all';
+
+  // Ad / Revive state
+  private hasUsedRevive = false;
+  private reviveAvailable = false;
+
+  constructor(canvas: HTMLCanvasElement) {
+    this.canvas = canvas;
+    const ctx = canvas.getContext('2d');
+    if (\!ctx) throw new Error('Canvas 2D context not supported');
+    this.ctx = ctx;
+    this.loadBest();
+    this.setupEvents();
+    getLocalUUID();
+    initAuth();
+    initSkins();
+    initAchievements();
+    initIAP();
+    initAds();
+  }
+
+  private resizeTimer = 0;
+
+  start(): void {
+    this.resize();
+    window.addEventListener('resize', () => {
+      clearTimeout(this.resizeTimer);
+      this.resizeTimer = window.setTimeout(() => this.resize(), 100);
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (this.audioCtx && this.audioCtx.state === 'running') {
+          this.audioCtx.suspend();
+        }
+      } else {
+        if (this.audioCtx && this.audioCtx.state === 'suspended' && this.bgmStarted) {
+          this.audioCtx.resume();
+        }
+      }
+    });
+    this.resetGame();
+    requestAnimationFrame((t) => this.loop(t));
+  }
+
+  private resize(): void {
+    const dpr = window.devicePixelRatio || 1;
+    this.w = window.innerWidth;
+    this.h = window.innerHeight;
+    this.canvas.width = this.w * dpr;
+    this.canvas.height = this.h * dpr;
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // PLAYING 상태에서는 groundY 변경하지 않기 (부활/게임 중 좌표 꼬임 방지)
+    if (this.state \!== GameState.PLAYING) {
+      this.groundY = this.h * 10;
+    }
+  }
+
+  private resetGame(): void {
+    this.bunnyX = this.w / 2;
+    this.bunnyY = this.groundY - BUNNY_RADIUS - 10;
+    this.velX = 0;
+    this.velY = 0;
+    this.cameraY = this.bunnyY;
+    this.targetCameraY = this.bunnyY;
+    this.score = 0;
+    this.heightReached = 0;
+    this.hasJumped = false;
+    this.goldenBuffActive = false;
+    this.touching = false;
+    this.touchX = this.w / 2;
+    this.shakeTimer = 0;
+    this.bunnyPose = BunnyPose.IDLE;
+    this.earBounce = 0;
+    this.animTime = 0;
+    this.particles = [];
+    this.scorePopups = [];
+    this.scoreBounce = 1.0;
+    this.scoreColor = '#FFF';
+    this.poolTopY = 0;
+    clearAchievementPopups();
+    this.hasUsedRevive = false;
+    this.reviveAvailable = false;
+    this.lastTime = performance.now();
+    this.generateInitialCarrotPool();
+    this.generateClouds();
+    this.startTime = performance.now();
+  }
+
+  private loadBest(): void {
+    this.bestScore = parseInt(localStorage.getItem('bh_bestScore') || '0', 10);
+    this.bestHeight = parseInt(localStorage.getItem('bh_bestHeight') || '0', 10);
+  }
+
+  private saveBest(): void {
+    if (this.score > this.bestScore) {
+      this.bestScore = this.score;
+      localStorage.setItem('bh_bestScore', String(this.bestScore));
+    }
+    const hMm = Math.floor(this.heightReached);
+    if (hMm > this.bestHeight) {
+      this.bestHeight = hMm;
+      localStorage.setItem('bh_bestHeight', String(this.bestHeight));
+    }
+  }
+
+  private generateClouds(): void {
+    this.clouds = [];
+    for (let i = 0; i < 40; i++) {
+      this.clouds.push({
+        x: rand(0, this.w),
+        y: rand(0, this.groundY),
+        z: rand(0.3, 1.0),
+        width: rand(60, 160),
+        speed: rand(0.1, 0.5),
+        opacity: rand(0.15, 0.4),
+      });
+    }
+  }
+
+  private generateInitialCarrotPool(): void {
+    this.carrots = [];
+    this.poolTopY = this.groundY - 80;
+    const targetTopY = this.groundY - (this.h * PRELOAD_HEIGHT_MULTIPLIER);
+    this.fillPoolTo(targetTopY, this.w / 2);
+  }
+
+  /** Extend the carrot pool upward as bunny climbs */
+  private extendCarrotPool(): void {
+    const targetTopY = this.bunnyY - (this.h * PRELOAD_HEIGHT_MULTIPLIER);
+    if (this.poolTopY <= targetTopY) return;
+
+    // Find the highest non-eaten carrot's X for continuity
+    let lastX = this.bunnyX;
+    let highestY = Infinity;
+    for (const c of this.carrots) {
+      if (\!c.eaten && c.y < highestY) {
+        highestY = c.y;
+        lastX = c.x;
+      }
+    }
+
+    this.fillPoolTo(targetTopY, lastX);
+  }
+
+  /** Fill carrots from current poolTopY upward to targetTopY */
+  private fillPoolTo(targetTopY: number, startX: number): void {
+    const margin = CARROT_RADIUS + 20;
+    const maxJumpReachX = this.w * 0.6;
+    // Safe gap bounds: Zone이 높을수록 허용 간격 증가 (Zone 6~7 난이도 무효화 방지)
+    const safeMinGap = NORMAL_JUMP_PEAK * 0.4;
+    let prevX = startX;
+
+    while (this.poolTopY > targetTopY) {
+      const height = this.groundY - this.poolTopY;
+      const zone = getZone(height);
+
+      // Zone 레벨에 따라 safeMaxGap 조정
+      const zoneLevel = height < 500 ? 0 : height < 1000 ? 1 : height < 1500 ? 2
+        : height < 3000 ? 3 : height < 5000 ? 4 : height < 8000 ? 5 : 6;
+      const safeMaxGap = NORMAL_JUMP_PEAK * (0.75 + zoneLevel * 0.05);
+
+      // Clamp zone gaps to safe bounds so bunny can always reach the next carrot
+      const minGap = Math.min(zone.minGap, safeMinGap);
+      const maxGap = Math.min(zone.maxGap, safeMaxGap);
+      const gap = rand(minGap, maxGap);
+
+      this.poolTopY -= gap;
+
+      const type: CarrotType = Math.random() < zone.specialChance
+        ? CarrotType.SPECIAL
+        : CarrotType.NORMAL;
+
+      // Place within reachable X range of previous carrot
+      const minX = Math.max(margin, prevX - maxJumpReachX);
+      const maxX = Math.min(this.w - margin, prevX + maxJumpReachX);
+      const x = rand(minX, maxX);
+
+      this.carrots.push({
+        x, y: this.poolTopY,
+        vy: CARROT_FALL_SPEED,
+        type, eaten: false,
+        radius: CARROT_RADIUS,
+      });
+      prevX = x;
+    }
+  }

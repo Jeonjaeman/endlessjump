@@ -10,6 +10,13 @@ interface CachedRanking {
 const cache: Record<string, CachedRanking> = {};
 const CACHE_TTL = 30_000; // 30 seconds
 
+/** 점수 제출 후 캐시 무효화 */
+export function invalidateCache(): void {
+  for (const key of Object.keys(cache)) {
+    delete cache[key];
+  }
+}
+
 export async function fetchRanking(mode: 'all' | 'weekly'): Promise<RankEntry[]> {
   const cacheKey = mode;
   const cached = cache[cacheKey];

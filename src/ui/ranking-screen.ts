@@ -14,6 +14,7 @@ export function renderRankingScreen(
   heightMm: number,
   bestScore: number,
   bestHeight: number,
+  reviveAvailable: boolean = false,
 ): void {
   // Dark overlay
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
@@ -152,11 +153,50 @@ export function renderRankingScreen(
     ctx.fillText(`${myRank.score}`, listX + listW - 8, myRowY + 12);
   }
 
+  // Revive button (리워드 광고로 부활)
+  if (reviveAvailable) {
+    const btnW = 220;
+    const btnH = 44;
+    const btnX = cx - btnW / 2;
+    const btnY = h - 90;
+
+    // Button background — gradient green
+    const btnGrad = ctx.createLinearGradient(btnX, btnY, btnX, btnY + btnH);
+    btnGrad.addColorStop(0, '#4CAF50');
+    btnGrad.addColorStop(1, '#388E3C');
+    ctx.fillStyle = btnGrad;
+    ctx.beginPath();
+    roundRect(ctx, btnX, btnY, btnW, btnH, 10);
+    ctx.fill();
+
+    // Button border
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    roundRect(ctx, btnX, btnY, btnW, btnH, 10);
+    ctx.stroke();
+
+    // Button text
+    ctx.fillStyle = '#FFF';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🎬 광고 보고 이어하기', cx, btnY + btnH / 2 + 6);
+  }
+
   // Tap to restart
   ctx.fillStyle = 'rgba(255,255,255,0.6)';
   ctx.font = '16px sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText('Tap to Restart', cx, h - 30);
+}
+
+export function getReviveHitArea(w: number, h: number): DOMRect {
+  const cx = w / 2;
+  const btnW = 220;
+  const btnH = 44;
+  const btnX = cx - btnW / 2;
+  const btnY = h - 90;
+  return new DOMRect(btnX, btnY, btnW, btnH);
 }
 
 export function getTabHitArea(w: number, h: number): { allTab: DOMRect; weeklyTab: DOMRect } {

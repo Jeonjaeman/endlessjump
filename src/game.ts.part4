@@ -1,0 +1,435 @@
+
+  private renderBunny3D(ctx: CanvasRenderingContext2D, x: number, screenY: number): void {
+    const skinColors = getCurrentSkinColors();
+    ctx.save();
+    ctx.translate(x, screenY);
+
+    const lean = clamp(this.velX * 0.05, -0.3, 0.3);
+    ctx.rotate(lean);
+
+    // Squash & stretch based on pose
+    let scaleX = 1.0;
+    let scaleY = 1.0;
+    if (this.bunnyPose === BunnyPose.JUMPING) {
+      scaleX = 0.82;
+      scaleY = 1.25;
+    } else if (this.bunnyPose === BunnyPose.FALLING) {
+      scaleX = 1.18;
+      scaleY = 0.82;
+    }
+    ctx.scale(scaleX, scaleY);
+
+    const R = BUNNY_RADIUS;
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.10)';
+    ctx.beginPath();
+    ctx.ellipse(2, R + 6, R * 0.9, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tail (fluffy pom-pom, drawn behind body)
+    const tailBob = Math.sin(this.animTime * 3) * 2;
+    ctx.save();
+    ctx.translate(0, R - 1 + tailBob);
+    const tailGrad = ctx.createRadialGradient(-1, -1, 1, 0, 0, 7);
+    tailGrad.addColorStop(0, '#FFFFFF');
+    tailGrad.addColorStop(0.6, '#F5F0F0');
+    tailGrad.addColorStop(1, '#E8E0E0');
+    ctx.fillStyle = tailGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, 7, 0, Math.PI * 2);
+    ctx.fill();
+    // Tail highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.beginPath();
+    ctx.arc(-2, -2, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Body (egg-shaped — taller ellipse)
+    const bodyGrad = ctx.createRadialGradient(-3, -5, 3, 0, 2, R + 2);
+    bodyGrad.addColorStop(0, skinColors.bodyLight);
+    bodyGrad.addColorStop(0.5, skinColors.body);
+    bodyGrad.addColorStop(0.8, skinColors.body);
+    bodyGrad.addColorStop(1, skinColors.bodyDark);
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.ellipse(0, 2, R - 1, R + 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Belly patch (lighter oval)
+    ctx.fillStyle = skinColors.belly;
+    ctx.beginPath();
+    ctx.ellipse(0, 5, R * 0.55, R * 0.65, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body highlight (specular)
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.beginPath();
+    ctx.ellipse(-5, -7, 7, 5, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Head (egg-shaped, slightly above body)
+    const headY = -R + 2;
+    const headGrad = ctx.createRadialGradient(-2, headY - 3, 2, 0, headY, R * 0.8);
+    headGrad.addColorStop(0, skinColors.bodyLight);
+    headGrad.addColorStop(0.7, skinColors.body);
+    headGrad.addColorStop(1, skinColors.bodyDark);
+    ctx.fillStyle = headGrad;
+    ctx.beginPath();
+    ctx.ellipse(0, headY, R * 0.75, R * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Cheeks (soft pink circles)
+    ctx.fillStyle = skinColors.cheek;
+    ctx.beginPath();
+    ctx.arc(-9, headY + 4, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(9, headY + 4, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ears
+    const earBaseY = headY - R * 0.55;
+    this.drawEar3D(ctx, -7, earBaseY, -0.15 + this.earBounce, skinColors);
+    this.drawEar3D(ctx, 7, earBaseY, 0.15 - this.earBounce, skinColors);
+
+    // Eyes — larger, more expressive
+    // Eye whites
+    ctx.fillStyle = '#FEFEFE';
+    ctx.beginPath();
+    ctx.ellipse(-6, headY - 1, 4.5, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(6, headY - 1, 4.5, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Pupils (large, dark)
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.arc(-5.5, headY, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(5.5, headY, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Eye highlights (two per eye for liveliness)
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(-6.5, headY - 1.5, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(-4.5, headY + 1, 0.7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(4.5, headY - 1.5, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(6.5, headY + 1, 0.7, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Nose (inverted triangle, pink)
+    const noseY = headY + 5;
+    const noseGrad = ctx.createRadialGradient(-0.5, noseY - 1, 0, 0, noseY, 3.5);
+    noseGrad.addColorStop(0, skinColors.nose);
+    noseGrad.addColorStop(1, skinColors.nose);
+    ctx.fillStyle = noseGrad;
+    ctx.beginPath();
+    ctx.moveTo(-3, noseY - 1.5);
+    ctx.quadraticCurveTo(0, noseY + 3, 3, noseY - 1.5);
+    ctx.quadraticCurveTo(0, noseY - 3, -3, noseY - 1.5);
+    ctx.fill();
+
+    // Mouth — :3 style
+    ctx.strokeStyle = '#CC8888';
+    ctx.lineWidth = 1.0;
+    ctx.lineCap = 'round';
+    // Left curve
+    ctx.beginPath();
+    ctx.arc(-3, noseY + 3, 3, -Math.PI * 0.8, -Math.PI * 0.1);
+    ctx.stroke();
+    // Right curve
+    ctx.beginPath();
+    ctx.arc(3, noseY + 3, 3, -Math.PI * 0.9, -Math.PI * 0.2);
+    ctx.stroke();
+
+    // Whiskers (3 per side, varied length/angle)
+    ctx.strokeStyle = 'rgba(140,130,125,0.35)';
+    ctx.lineWidth = 0.7;
+    // Left whiskers
+    ctx.beginPath(); ctx.moveTo(-8, noseY + 1); ctx.lineTo(-20, noseY - 3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-8, noseY + 2); ctx.lineTo(-21, noseY + 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-8, noseY + 3); ctx.lineTo(-19, noseY + 6); ctx.stroke();
+    // Right whiskers
+    ctx.beginPath(); ctx.moveTo(8, noseY + 1); ctx.lineTo(20, noseY - 3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(8, noseY + 2); ctx.lineTo(21, noseY + 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(8, noseY + 3); ctx.lineTo(19, noseY + 6); ctx.stroke();
+
+    // Feet — pose-dependent
+    if (this.bunnyPose === BunnyPose.JUMPING) {
+      // Feet tucked up and stretched
+      const footGrad = ctx.createRadialGradient(0, R + 3, 1, 0, R + 3, 6);
+      footGrad.addColorStop(0, '#F0ECEC');
+      footGrad.addColorStop(1, '#DDD5D5');
+      ctx.fillStyle = footGrad;
+      ctx.beginPath();
+      ctx.ellipse(-6, R + 4, 5, 2.5, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(6, R + 4, 5, 2.5, 0.3, 0, Math.PI * 2);
+      ctx.fill();
+      // Toe pads
+      ctx.fillStyle = 'rgba(255,190,190,0.3)';
+      ctx.beginPath(); ctx.arc(-8, R + 3, 1.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(8, R + 3, 1.5, 0, Math.PI * 2); ctx.fill();
+    } else if (this.bunnyPose === BunnyPose.FALLING) {
+      // Feet spread out
+      ctx.fillStyle = '#E8E4E4';
+      ctx.beginPath();
+      ctx.ellipse(-8, R + 2, 6, 3.5, -0.15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(8, R + 2, 6, 3.5, 0.15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,190,190,0.25)';
+      ctx.beginPath(); ctx.arc(-10, R + 1, 1.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(10, R + 1, 1.5, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // Idle — rounded sitting paws
+      ctx.fillStyle = '#E8E4E4';
+      ctx.beginPath();
+      ctx.ellipse(-7, R, 6, 4.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(7, R, 6, 4.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Toe pads
+      ctx.fillStyle = 'rgba(255,190,190,0.3)';
+      ctx.beginPath(); ctx.arc(-9, R - 1, 1.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(-6, R - 2, 1.2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(9, R - 1, 1.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(6, R - 2, 1.2, 0, Math.PI * 2); ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  private drawEar3D(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, skinColors?: SkinColors): void {
+    const sc = skinColors || getCurrentSkinColors();
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+
+    // Outer ear
+    const earGrad = ctx.createLinearGradient(-6, 0, 6, 0);
+    earGrad.addColorStop(0, sc.bodyDark);
+    earGrad.addColorStop(0.3, sc.bodyLight);
+    earGrad.addColorStop(0.7, sc.bodyLight);
+    earGrad.addColorStop(1, sc.bodyDark);
+    ctx.fillStyle = earGrad;
+    ctx.beginPath();
+    ctx.ellipse(0, -12, 6, 16, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Inner ear
+    const innerGrad = ctx.createLinearGradient(-3, -4, 3, -4);
+    innerGrad.addColorStop(0, sc.earInner);
+    innerGrad.addColorStop(0.5, sc.earInner);
+    innerGrad.addColorStop(1, sc.earInner);
+    ctx.fillStyle = innerGrad;
+    ctx.beginPath();
+    ctx.ellipse(0, -12, 3.5, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Inner ear vein detail (subtle darker line)
+    ctx.strokeStyle = 'rgba(220,130,140,0.25)';
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(0, -3);
+    ctx.quadraticCurveTo(-1.5, -12, 0, -22);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, -6);
+    ctx.quadraticCurveTo(1, -12, -0.5, -18);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  private renderParticles(ctx: CanvasRenderingContext2D): void {
+    for (const p of this.particles) {
+      const sy = this.worldToScreen(p.y);
+      const alpha = p.life / p.maxLife;
+      ctx.globalAlpha = alpha;
+
+      const grad = ctx.createRadialGradient(p.x, sy, 0, p.x, sy, p.radius);
+      grad.addColorStop(0, p.color);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(p.x, sy, p.radius * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  private renderHUD(ctx: CanvasRenderingContext2D): void {
+    const heightMm = Math.floor(this.heightReached);
+
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    const hudW = 170;
+    const hudH = 65;
+    const hudX = 10;
+    const hudY = 10;
+    const r = 10;
+    ctx.beginPath();
+    ctx.moveTo(hudX + r, hudY);
+    ctx.lineTo(hudX + hudW - r, hudY);
+    ctx.quadraticCurveTo(hudX + hudW, hudY, hudX + hudW, hudY + r);
+    ctx.lineTo(hudX + hudW, hudY + hudH - r);
+    ctx.quadraticCurveTo(hudX + hudW, hudY + hudH, hudX + hudW - r, hudY + hudH);
+    ctx.lineTo(hudX + r, hudY + hudH);
+    ctx.quadraticCurveTo(hudX, hudY + hudH, hudX, hudY + hudH - r);
+    ctx.lineTo(hudX, hudY + r);
+    ctx.quadraticCurveTo(hudX, hudY, hudX + r, hudY);
+    ctx.closePath();
+    ctx.fill();
+
+    // Score with bounce animation
+    ctx.save();
+    const scoreTextX = 20;
+    const scoreTextY = 36;
+    const bounce = this.scoreBounce;
+    ctx.translate(scoreTextX, scoreTextY);
+    ctx.scale(bounce, bounce);
+    ctx.translate(-scoreTextX, -scoreTextY);
+    ctx.fillStyle = this.scoreColor;
+    ctx.font = 'bold 18px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Score: ${this.score}`, scoreTextX, scoreTextY);
+    ctx.restore();
+
+    ctx.font = '14px sans-serif';
+    ctx.fillStyle = '#CCC';
+    ctx.fillText(`Height: ${heightMm}mm`, 20, 58);
+
+    // Score popups (floating +1, +2 GOLD text)
+    for (const p of this.scorePopups) {
+      const sy = this.worldToScreen(p.y);
+      const alpha = p.life / p.maxLife;
+      const popScale = 0.5 + (p.life / p.maxLife) * (p.scale - 0.5);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(p.x, sy);
+      ctx.scale(popScale, popScale);
+      ctx.font = 'bold 20px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+      ctx.lineWidth = 3;
+      ctx.strokeText(p.text, 0, 0);
+      ctx.fillStyle = p.color;
+      ctx.fillText(p.text, 0, 0);
+      ctx.restore();
+    }
+  }
+
+  private renderStartScreen(ctx: CanvasRenderingContext2D): void {
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillRect(0, 0, this.w, this.h);
+
+    ctx.fillStyle = '#FFF';
+    ctx.font = 'bold 36px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0,0,0,0.4)';
+    ctx.shadowBlur = 8;
+    ctx.fillText('무한의당근', this.w / 2, this.h / 3);
+    ctx.shadowBlur = 0;
+
+    ctx.font = '20px sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fillText('Tap to Start', this.w / 2, this.h / 3 + 50);
+
+    if (this.bestScore > 0) {
+      ctx.font = '16px sans-serif';
+      ctx.fillStyle = '#FFD700';
+      ctx.fillText(`BEST: ${this.bestScore} pts / ${this.bestHeight}mm`, this.w / 2, this.h / 3 + 90);
+    }
+  }
+
+  private handleReviveTap(x: number, y: number): boolean {
+    if (\!this.reviveAvailable) return false;
+    const btn = getReviveHitArea(this.w, this.h);
+    if (x >= btn.x && x <= btn.x + btn.width &&
+        y >= btn.y && y <= btn.y + btn.height) {
+      this.tryRevive();
+      return true;
+    }
+    return false;
+  }
+
+  private async tryRevive(): Promise<void> {
+    // 광고 제거 구매자는 광고 없이 바로 부활
+    let rewarded = false;
+    if (areAdsRemoved()) {
+      rewarded = true;
+    } else {
+      rewarded = await showRewardedAd();
+    }
+    if (rewarded) {
+      this.hasUsedRevive = true;
+      this.reviveAvailable = false;
+      // 마지막 도달 높이 근처에서 부활 (바닥이 아닌)
+      this.bunnyY = this.groundY - this.heightReached + 200;
+      this.bunnyX = this.w / 2;
+      this.cameraY = this.bunnyY;
+      this.targetCameraY = this.bunnyY;
+      this.poolTopY = this.bunnyY + 100;
+      this.fillPoolTo(this.bunnyY - this.h * 2, this.bunnyX);
+      this.state = GameState.PLAYING;
+      this.velY = JUMP_VELOCITY;
+      this.hasJumped = true;
+      this.startBGM();
+    }
+  }
+
+  private handleShopButtonTap(x: number, y: number): boolean {
+    const btn = getShopButtonArea(this.w, this.h);
+    if (x >= btn.x && x <= btn.x + btn.width &&
+        y >= btn.y && y <= btn.y + btn.height) {
+      openShop();
+      return true;
+    }
+    return false;
+  }
+
+  private handleTabTap(x: number, y: number): boolean {
+    const { allTab, weeklyTab } = getTabHitArea(this.w, this.h);
+    if (x >= allTab.x && x <= allTab.x + allTab.width &&
+        y >= allTab.y && y <= allTab.y + allTab.height) {
+      if (this.rankingTab \!== 'all') {
+        this.rankingTab = 'all';
+        this.loadRankings();
+      }
+      return true;
+    }
+    if (x >= weeklyTab.x && x <= weeklyTab.x + weeklyTab.width &&
+        y >= weeklyTab.y && y <= weeklyTab.y + weeklyTab.height) {
+      if (this.rankingTab \!== 'weekly') {
+        this.rankingTab = 'weekly';
+        this.loadRankings();
+      }
+      return true;
+    }
+    return false;
+  }
+
+  private renderGameOverScreen(ctx: CanvasRenderingContext2D): void {
+    renderRankingScreen(
+      ctx, this.w, this.h,
+      this.rankings, this.myRank, this.rankingTab,
+      this.score, Math.floor(this.heightReached),
+      this.bestScore, this.bestHeight,
+      this.reviveAvailable,
+    );
+  }
+}

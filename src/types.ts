@@ -54,3 +54,45 @@ export interface RankEntry {
   country_code: string;
   is_me: boolean;
 }
+
+// -- Phase 5: IAP / Skin / Achievement --
+
+export interface SkinColors {
+  body: string;
+  bodyLight: string;
+  bodyDark: string;
+  belly: string;
+  earInner: string;
+  nose: string;
+  cheek: string;
+}
+
+export interface BunnySkin {
+  id: string;
+  name: string;
+  description: string;
+  colors: SkinColors;
+  price: number;
+  productId: string;
+  unlocked: boolean;
+}
+
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  target: number;
+  current: number;
+  completed: boolean;
+  reward: number;
+  type: 'daily' | 'permanent';
+}
+
+export interface IAPProduct {
+  id: string;
+  name: string;
+  description: string;
+  price: string;
+  type: 'non_consumable';
+}

@@ -1,14 +1,10 @@
-import { GameState, CarrotType, BunnyPose, type Carrot, type Particle, type Cloud, type ScorePopup, type RankEntry, type SkinColors } from './types';
+import { GameState, CarrotType, BunnyPose, type Carrot, type Particle, type Cloud, type ScorePopup, type RankEntry } from './types';
 import { initAuth, getLocalUUID } from './services/auth';
 import { submitScore } from './services/score';
-import { fetchRanking, invalidateCache } from './services/leaderboard';
+import { fetchRanking } from './services/leaderboard';
 import { renderRankingScreen, getTabHitArea, getReviveHitArea } from './ui/ranking-screen';
 import { showProfileModal } from './ui/profile-modal';
-import { initAds, showBanner, hideBanner, showInterstitialOnGameOver, isRewardedReady, showRewardedAd, areAdsRemoved } from './services/ad-service';
-import { initIAP } from './services/iap-service';
-import { initSkins, getCurrentSkinColors } from './services/skin-service';
-import { initAchievements, onGameOver as achOnGameOver, onCarrotEaten as achOnCarrotEaten, popRecentlyCompleted } from './services/achievement-service';
-import { isShopOpen, openShop, closeShop, handleShopTap, renderShop, renderShopButton, getShopButtonArea, renderAchievementPopup, queueAchievementPopup, clearAchievementPopups } from './ui/shop-screen';
+import { initAds, showBanner, hideBanner, showInterstitialOnGameOver, isRewardedReady, showRewardedAd } from './services/ad-service';
 
 const GRAVITY = 0.6;
 const JUMP_VELOCITY = -15;
@@ -102,7 +98,6 @@ export class Game {
   private audioCtx: AudioContext | null = null;
   private bgmGain: GainNode | null = null;
   private bgmStarted = false;
-  private bgmTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // Ranking state
   private rankings: RankEntry[] = [];
@@ -122,9 +117,6 @@ export class Game {
     this.setupEvents();
     getLocalUUID();
     initAuth();
-    initSkins();
-    initAchievements();
-    initIAP();
     initAds();
   }
 
@@ -158,10 +150,7 @@ export class Game {
     this.canvas.width = this.w * dpr;
     this.canvas.height = this.h * dpr;
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // PLAYING 상태에서는 groundY 변경하지 않기 (부활/게임 중 좌표 꼬임 방지)
-    if (this.state !== GameState.PLAYING) {
-      this.groundY = this.h * 10;
-    }
+    this.groundY = this.h * 10;
   }
 
   private resetGame(): void {
@@ -186,7 +175,6 @@ export class Game {
     this.scoreBounce = 1.0;
     this.scoreColor = '#FFF';
     this.poolTopY = 0;
-    clearAchievementPopups();
     this.hasUsedRevive = false;
     this.reviveAvailable = false;
     this.lastTime = performance.now();
@@ -255,18 +243,14 @@ export class Game {
   private fillPoolTo(targetTopY: number, startX: number): void {
     const margin = CARROT_RADIUS + 20;
     const maxJumpReachX = this.w * 0.6;
-    // Safe gap bounds: Zone이 높을수록 허용 간격 증가 (Zone 6~7 난이도 무효화 방지)
+    // Safe gap bounds: always within normal jump reach (40%~90% of peak)
+    const safeMaxGap = NORMAL_JUMP_PEAK * 0.9;
     const safeMinGap = NORMAL_JUMP_PEAK * 0.4;
     let prevX = startX;
 
     while (this.poolTopY > targetTopY) {
       const height = this.groundY - this.poolTopY;
       const zone = getZone(height);
-
-      // Zone 레벨에 따라 safeMaxGap 조정
-      const zoneLevel = height < 500 ? 0 : height < 1000 ? 1 : height < 1500 ? 2
-        : height < 3000 ? 3 : height < 5000 ? 4 : height < 8000 ? 5 : 6;
-      const safeMaxGap = NORMAL_JUMP_PEAK * (0.75 + zoneLevel * 0.05);
 
       // Clamp zone gaps to safe bounds so bunny can always reach the next carrot
       const minGap = Math.min(zone.minGap, safeMinGap);
@@ -311,8 +295,7 @@ export class Game {
     if (!this.audioCtx || !this.bgmGain) return;
     // Stop any previous loop before starting fresh
     this.bgmStarted = false;
-    if (this.bgmTimeout) clearTimeout(this.bgmTimeout);
-    this.bgmTimeout = setTimeout(() => {
+    setTimeout(() => {
       this.bgmStarted = true;
       this.scheduleBGMLoop();
     }, 50);
@@ -509,11 +492,6 @@ export class Game {
       this.initAudio();
       const t = e.touches[0];
       this.touchX = t.clientX;
-      // 상점 열려 있으면 상점 터치 처리
-      if (isShopOpen()) {
-        handleShopTap(t.clientX, t.clientY);
-        return;
-      }
       if (this.state === GameState.START) {
         this.state = GameState.PLAYING;
         this.velY = JUMP_VELOCITY;
@@ -521,11 +499,10 @@ export class Game {
         this.touching = true;
         this.startTime = performance.now();
         this.startBGM();
-        if (!areAdsRemoved()) showBanner();
+        showBanner();
         return;
       }
       if (this.state === GameState.GAME_OVER) {
-        if (this.handleShopButtonTap(t.clientX, t.clientY)) return;
         if (this.handleTabTap(t.clientX, t.clientY)) return;
         if (this.handleReviveTap(t.clientX, t.clientY)) return;
         this.resetGame();
@@ -549,11 +526,6 @@ export class Game {
     c.addEventListener('mousedown', (e) => {
       this.initAudio();
       this.touchX = e.clientX;
-      // 상점 열려 있으면 상점 터치 처리
-      if (isShopOpen()) {
-        handleShopTap(e.clientX, e.clientY);
-        return;
-      }
       if (this.state === GameState.START) {
         this.state = GameState.PLAYING;
         this.velY = JUMP_VELOCITY;
@@ -561,11 +533,10 @@ export class Game {
         this.touching = true;
         this.startTime = performance.now();
         this.startBGM();
-        if (!areAdsRemoved()) showBanner();
+        showBanner();
         return;
       }
       if (this.state === GameState.GAME_OVER) {
-        if (this.handleShopButtonTap(e.clientX, e.clientY)) return;
         if (this.handleTabTap(e.clientX, e.clientY)) return;
         if (this.handleReviveTap(e.clientX, e.clientY)) return;
         this.resetGame();
@@ -619,9 +590,8 @@ export class Game {
 
     if (this.touching) {
       const targetX = clamp(this.touchX, BUNNY_RADIUS, this.w - BUNNY_RADIUS);
-      const move = (targetX - this.bunnyX) * 0.15;
-      this.bunnyX += move;
-      this.velX = move;
+      this.bunnyX += (targetX - this.bunnyX) * 0.15;
+      this.velX = (targetX - this.bunnyX) * 0.15;
     } else {
       this.velX *= 0.85;
       this.bunnyX += this.velX;
@@ -717,7 +687,6 @@ export class Game {
 
   private onCarrotEaten(c: Carrot): void {
     if (c.type === CarrotType.NORMAL) {
-      achOnCarrotEaten('normal');
       if (this.goldenBuffActive) {
         this.velY = JUMP_VELOCITY * 1.5;
         this.goldenBuffActive = false;
@@ -744,7 +713,6 @@ export class Game {
       }
       this.playCarrotSound();
     } else if (c.type === CarrotType.SPECIAL) {
-      achOnCarrotEaten('special');
       this.velY = JUMP_VELOCITY * 2;
       this.score += 2;
       this.goldenBuffActive = true;
@@ -781,36 +749,26 @@ export class Game {
     this.stopBGM();
     hideBanner();
 
-    // 업적 체크
-    achOnGameOver(this.score, Math.floor(this.heightReached));
-    // 달성된 업적 팝업 큐
-    const completed = popRecentlyCompleted();
-    for (const ach of completed) {
-      queueAchievementPopup(ach);
+    // 부활 가능 여부: 이번 게임에서 아직 부활 안 했고, 리워드 광고 준비됨
+    this.reviveAvailable = !this.hasUsedRevive && isRewardedReady();
+
+    // 전면 광고 표시 (N회 게임 오버마다)
+    showInterstitialOnGameOver();
+
+    // Prompt profile setup once (persisted to localStorage)
+    if (!localStorage.getItem('bh_profile_set')) {
+      localStorage.setItem('bh_profile_set', '1');
+      showProfileModal();
     }
 
-    // 부활 가능 여부: 이번 게임에서 아직 부활 안 했고, (리워드 광고 준비됨 또는 광고 제거 구매자)
-    this.reviveAvailable = !this.hasUsedRevive && (isRewardedReady() || areAdsRemoved());
-
-    // 전면 광고 표시 (N회 게임 오버마다, 광고 제거 시 스킵)
-    if (!areAdsRemoved()) showInterstitialOnGameOver();
-
-    // Submit score first, then fetch rankings (프로필 모달 완료 후)
+    // Submit score first, then fetch rankings
     const heightMm = Math.floor(this.heightReached);
     this.rankingTab = 'all';
-    (async () => {
-      // Prompt profile setup once (persisted to localStorage)
-      if (!localStorage.getItem('bh_profile_set')) {
-        localStorage.setItem('bh_profile_set', '1');
-        await showProfileModal();
-      }
-      await this.submitAndLoadRankings(heightMm);
-    })();
+    this.submitAndLoadRankings(heightMm);
   }
 
   private async submitAndLoadRankings(heightMm: number): Promise<void> {
     await submitScore({ score: this.score, height: heightMm });
-    invalidateCache(); // 점수 제출 후 캐시 무효화하여 최신 랭킹 반영
     await this.loadRankings();
   }
 
@@ -870,16 +828,7 @@ export class Game {
       this.renderCarrots3D(ctx);
       this.renderBunny3D(ctx, this.bunnyX, this.worldToScreen(this.bunnyY));
       this.renderGameOverScreen(ctx);
-      renderShopButton(ctx, this.w, this.h);
     }
-
-    // 상점 오버레이 (모든 상태 위에)
-    if (isShopOpen()) {
-      renderShop(ctx, this.w, this.h);
-    }
-
-    // 업적 달성 팝업 (최상위)
-    renderAchievementPopup(ctx, this.w, this.h);
 
     ctx.restore();
   }
@@ -1098,7 +1047,6 @@ export class Game {
   }
 
   private renderBunny3D(ctx: CanvasRenderingContext2D, x: number, screenY: number): void {
-    const skinColors = getCurrentSkinColors();
     ctx.save();
     ctx.translate(x, screenY);
 
@@ -1146,17 +1094,17 @@ export class Game {
 
     // Body (egg-shaped — taller ellipse)
     const bodyGrad = ctx.createRadialGradient(-3, -5, 3, 0, 2, R + 2);
-    bodyGrad.addColorStop(0, skinColors.bodyLight);
-    bodyGrad.addColorStop(0.5, skinColors.body);
-    bodyGrad.addColorStop(0.8, skinColors.body);
-    bodyGrad.addColorStop(1, skinColors.bodyDark);
+    bodyGrad.addColorStop(0, '#FFFFFF');
+    bodyGrad.addColorStop(0.5, '#F5F2F0');
+    bodyGrad.addColorStop(0.8, '#E8E4E0');
+    bodyGrad.addColorStop(1, '#D5D0CC');
     ctx.fillStyle = bodyGrad;
     ctx.beginPath();
     ctx.ellipse(0, 2, R - 1, R + 2, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // Belly patch (lighter oval)
-    ctx.fillStyle = skinColors.belly;
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.beginPath();
     ctx.ellipse(0, 5, R * 0.55, R * 0.65, 0, 0, Math.PI * 2);
     ctx.fill();
@@ -1170,16 +1118,16 @@ export class Game {
     // Head (egg-shaped, slightly above body)
     const headY = -R + 2;
     const headGrad = ctx.createRadialGradient(-2, headY - 3, 2, 0, headY, R * 0.8);
-    headGrad.addColorStop(0, skinColors.bodyLight);
-    headGrad.addColorStop(0.7, skinColors.body);
-    headGrad.addColorStop(1, skinColors.bodyDark);
+    headGrad.addColorStop(0, '#FFFFFF');
+    headGrad.addColorStop(0.7, '#F0EDEB');
+    headGrad.addColorStop(1, '#DDD8D5');
     ctx.fillStyle = headGrad;
     ctx.beginPath();
     ctx.ellipse(0, headY, R * 0.75, R * 0.7, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // Cheeks (soft pink circles)
-    ctx.fillStyle = skinColors.cheek;
+    ctx.fillStyle = 'rgba(255,180,180,0.2)';
     ctx.beginPath();
     ctx.arc(-9, headY + 4, 5, 0, Math.PI * 2);
     ctx.fill();
@@ -1189,8 +1137,8 @@ export class Game {
 
     // Ears
     const earBaseY = headY - R * 0.55;
-    this.drawEar3D(ctx, -7, earBaseY, -0.15 + this.earBounce, skinColors);
-    this.drawEar3D(ctx, 7, earBaseY, 0.15 - this.earBounce, skinColors);
+    this.drawEar3D(ctx, -7, earBaseY, -0.15 + this.earBounce);
+    this.drawEar3D(ctx, 7, earBaseY, 0.15 - this.earBounce);
 
     // Eyes — larger, more expressive
     // Eye whites
@@ -1229,8 +1177,8 @@ export class Game {
     // Nose (inverted triangle, pink)
     const noseY = headY + 5;
     const noseGrad = ctx.createRadialGradient(-0.5, noseY - 1, 0, 0, noseY, 3.5);
-    noseGrad.addColorStop(0, skinColors.nose);
-    noseGrad.addColorStop(1, skinColors.nose);
+    noseGrad.addColorStop(0, '#FFB8B8');
+    noseGrad.addColorStop(1, '#FF8899');
     ctx.fillStyle = noseGrad;
     ctx.beginPath();
     ctx.moveTo(-3, noseY - 1.5);
@@ -1312,28 +1260,28 @@ export class Game {
     ctx.restore();
   }
 
-  private drawEar3D(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, skinColors?: SkinColors): void {
-    const sc = skinColors || getCurrentSkinColors();
+  private drawEar3D(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number): void {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(angle);
 
     // Outer ear
     const earGrad = ctx.createLinearGradient(-6, 0, 6, 0);
-    earGrad.addColorStop(0, sc.bodyDark);
-    earGrad.addColorStop(0.3, sc.bodyLight);
-    earGrad.addColorStop(0.7, sc.bodyLight);
-    earGrad.addColorStop(1, sc.bodyDark);
+    earGrad.addColorStop(0, '#E5E2E0');
+    earGrad.addColorStop(0.3, '#FFFFFF');
+    earGrad.addColorStop(0.7, '#FFFFFF');
+    earGrad.addColorStop(1, '#D5D0CC');
     ctx.fillStyle = earGrad;
     ctx.beginPath();
     ctx.ellipse(0, -12, 6, 16, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Inner ear
+    // Inner ear (blood-vessel pink detail)
     const innerGrad = ctx.createLinearGradient(-3, -4, 3, -4);
-    innerGrad.addColorStop(0, sc.earInner);
-    innerGrad.addColorStop(0.5, sc.earInner);
-    innerGrad.addColorStop(1, sc.earInner);
+    innerGrad.addColorStop(0, '#FFCCCC');
+    innerGrad.addColorStop(0.3, '#FFB0B8');
+    innerGrad.addColorStop(0.7, '#FFB6C1');
+    innerGrad.addColorStop(1, '#FFAAAA');
     ctx.fillStyle = innerGrad;
     ctx.beginPath();
     ctx.ellipse(0, -12, 3.5, 12, 0, 0, Math.PI * 2);
@@ -1457,77 +1405,4 @@ export class Game {
   private handleReviveTap(x: number, y: number): boolean {
     if (!this.reviveAvailable) return false;
     const btn = getReviveHitArea(this.w, this.h);
-    if (x >= btn.x && x <= btn.x + btn.width &&
-        y >= btn.y && y <= btn.y + btn.height) {
-      this.tryRevive();
-      return true;
-    }
-    return false;
-  }
-
-  private async tryRevive(): Promise<void> {
-    // 광고 제거 구매자는 광고 없이 바로 부활
-    let rewarded = false;
-    if (areAdsRemoved()) {
-      rewarded = true;
-    } else {
-      rewarded = await showRewardedAd();
-    }
-    if (rewarded) {
-      this.hasUsedRevive = true;
-      this.reviveAvailable = false;
-      // 마지막 도달 높이 근처에서 부활 (바닥이 아닌)
-      this.bunnyY = this.groundY - this.heightReached + 200;
-      this.bunnyX = this.w / 2;
-      this.cameraY = this.bunnyY;
-      this.targetCameraY = this.bunnyY;
-      this.poolTopY = this.bunnyY + 100;
-      this.fillPoolTo(this.bunnyY - this.h * 2, this.bunnyX);
-      this.state = GameState.PLAYING;
-      this.velY = JUMP_VELOCITY;
-      this.hasJumped = true;
-      this.startBGM();
-    }
-  }
-
-  private handleShopButtonTap(x: number, y: number): boolean {
-    const btn = getShopButtonArea(this.w, this.h);
-    if (x >= btn.x && x <= btn.x + btn.width &&
-        y >= btn.y && y <= btn.y + btn.height) {
-      openShop();
-      return true;
-    }
-    return false;
-  }
-
-  private handleTabTap(x: number, y: number): boolean {
-    const { allTab, weeklyTab } = getTabHitArea(this.w, this.h);
-    if (x >= allTab.x && x <= allTab.x + allTab.width &&
-        y >= allTab.y && y <= allTab.y + allTab.height) {
-      if (this.rankingTab !== 'all') {
-        this.rankingTab = 'all';
-        this.loadRankings();
-      }
-      return true;
-    }
-    if (x >= weeklyTab.x && x <= weeklyTab.x + weeklyTab.width &&
-        y >= weeklyTab.y && y <= weeklyTab.y + weeklyTab.height) {
-      if (this.rankingTab !== 'weekly') {
-        this.rankingTab = 'weekly';
-        this.loadRankings();
-      }
-      return true;
-    }
-    return false;
-  }
-
-  private renderGameOverScreen(ctx: CanvasRenderingContext2D): void {
-    renderRankingScreen(
-      ctx, this.w, this.h,
-      this.rankings, this.myRank, this.rankingTab,
-      this.score, Math.floor(this.heightReached),
-      this.bestScore, this.bestHeight,
-      this.reviveAvailable,
-    );
-  }
-}
+    if (x 

@@ -1,0 +1,549 @@
+
+  private initAudio(): void {
+    if (this.audioCtx) {
+      if (this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume();
+      }
+      return;
+    }
+    this.audioCtx = new AudioContext();
+    this.bgmGain = this.audioCtx.createGain();
+    this.bgmGain.gain.value = 0.12;
+    this.bgmGain.connect(this.audioCtx.destination);
+  }
+
+  private startBGM(): void {
+    if (\!this.audioCtx || \!this.bgmGain) return;
+    // Stop any previous loop before starting fresh
+    this.bgmStarted = false;
+    if (this.bgmTimeout) clearTimeout(this.bgmTimeout);
+    this.bgmTimeout = setTimeout(() => {
+      this.bgmStarted = true;
+      this.scheduleBGMLoop();
+    }, 50);
+  }
+
+  private scheduleBGMLoop(): void {
+    if (\!this.audioCtx || \!this.bgmGain) return;
+    const ctx = this.audioCtx;
+    const gain = this.bgmGain;
+    const bpm = 140;
+    const beatDur = 60 / bpm;
+
+    // Cute waltz melody (3/4 time) using pentatonic-friendly notes
+    const melody: [number, number][] = [
+      // [frequency Hz, duration in beats]
+      [523, 1], [587, 0.5], [659, 0.5], [784, 1], [659, 1],
+      [587, 1], [523, 0.5], [440, 0.5], [523, 1], [587, 1],
+      [659, 1], [784, 0.5], [880, 0.5], [784, 1], [659, 1],
+      [523, 1], [587, 0.5], [523, 0.5], [440, 1], [523, 1],
+    ];
+
+    // Bass waltz pattern (oom-pah-pah)
+    const bassNotes: [number, number][] = [
+      [131, 1], [196, 0.5], [196, 0.5], [165, 1], [247, 0.5], [247, 0.5],
+      [175, 1], [262, 0.5], [262, 0.5], [131, 1], [196, 0.5], [196, 0.5],
+      [131, 1], [196, 0.5], [196, 0.5], [165, 1], [247, 0.5], [247, 0.5],
+      [175, 1], [262, 0.5], [262, 0.5], [131, 1], [196, 0.5], [196, 0.5],
+    ];
+
+    const startTime = ctx.currentTime + 0.05;
+
+    // Melody voice (triangle wave for soft piano-like tone)
+    let t = startTime;
+    for (const [freq, beats] of melody) {
+      const dur = beats * beatDur;
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      env.gain.setValueAtTime(0, t);
+      env.gain.linearRampToValueAtTime(0.3, t + 0.02);
+      env.gain.exponentialRampToValueAtTime(0.001, t + dur * 0.95);
+      osc.connect(env);
+      env.connect(gain);
+      osc.start(t);
+      osc.stop(t + dur);
+      t += dur;
+    }
+    const loopDuration = t - startTime;
+
+    // Bass voice (sine wave, lower volume)
+    let tb = startTime;
+    for (const [freq, beats] of bassNotes) {
+      const dur = beats * beatDur;
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      env.gain.setValueAtTime(0, tb);
+      env.gain.linearRampToValueAtTime(0.15, tb + 0.01);
+      env.gain.exponentialRampToValueAtTime(0.001, tb + dur * 0.9);
+      osc.connect(env);
+      env.connect(gain);
+      osc.start(tb);
+      osc.stop(tb + dur);
+      tb += dur;
+    }
+
+    // Schedule next loop iteration
+    const nextStart = startTime + loopDuration;
+    const scheduleAhead = loopDuration * 1000 - 200;
+    setTimeout(() => {
+      if (this.bgmStarted) this.scheduleBGMLoop();
+    }, Math.max(scheduleAhead, 100));
+  }
+
+  private stopBGM(): void {
+    this.bgmStarted = false;
+    if (this.audioCtx && this.audioCtx.state === 'running') {
+      this.audioCtx.suspend();
+    }
+  }
+
+  private playCarrotSound(): void {
+    if (\!this.audioCtx) return;
+    const ctx = this.audioCtx;
+    const t = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    const env = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(500, t);
+    osc.frequency.linearRampToValueAtTime(600, t + 0.04);
+    osc.frequency.linearRampToValueAtTime(400, t + 0.15);
+    env.gain.setValueAtTime(0.2, t);
+    env.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    osc.connect(env);
+    env.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.15);
+
+    // Add a noise burst for crunch texture
+    const bufferSize = ctx.sampleRate * 0.08;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * 0.3;
+    }
+    const noise = ctx.createBufferSource();
+    const noiseEnv = ctx.createGain();
+    const noiseFilter = ctx.createBiquadFilter();
+    noise.buffer = buffer;
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.value = 2000;
+    noiseFilter.Q.value = 1.5;
+    noiseEnv.gain.setValueAtTime(0.15, t);
+    noiseEnv.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseEnv);
+    noiseEnv.connect(ctx.destination);
+    noise.start(t);
+    noise.stop(t + 0.08);
+  }
+
+  private playGoldenCarrotSound(): void {
+    if (\!this.audioCtx) return;
+    const ctx = this.audioCtx;
+    const t = ctx.currentTime;
+
+    // Fanfare arpeggio: C5 -> E5 -> G5 -> C6
+    const notes = [523, 659, 784, 1047];
+    const noteDur = 0.12;
+
+    for (let i = 0; i < notes.length; i++) {
+      const noteTime = t + i * noteDur;
+
+      // Main tone (triangle for warmth)
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = notes[i];
+      env.gain.setValueAtTime(0, noteTime);
+      env.gain.linearRampToValueAtTime(0.3, noteTime + 0.02);
+      env.gain.setValueAtTime(0.3, noteTime + noteDur * 0.6);
+      env.gain.exponentialRampToValueAtTime(0.001, noteTime + noteDur + 0.15);
+      osc.connect(env);
+      env.connect(ctx.destination);
+      osc.start(noteTime);
+      osc.stop(noteTime + noteDur + 0.15);
+
+      // Harmony layer (sine, octave up, quieter)
+      const osc2 = ctx.createOscillator();
+      const env2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.value = notes[i] * 2;
+      env2.gain.setValueAtTime(0, noteTime);
+      env2.gain.linearRampToValueAtTime(0.08, noteTime + 0.02);
+      env2.gain.exponentialRampToValueAtTime(0.001, noteTime + noteDur + 0.1);
+      osc2.connect(env2);
+      env2.connect(ctx.destination);
+      osc2.start(noteTime);
+      osc2.stop(noteTime + noteDur + 0.1);
+    }
+
+    // Shimmer effect (noise sweep at the end)
+    const shimmerStart = t + notes.length * noteDur;
+    const bufLen = ctx.sampleRate * 0.2;
+    const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+    const ch = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) {
+      ch[i] = (Math.random() * 2 - 1) * 0.2;
+    }
+    const shimmer = ctx.createBufferSource();
+    const shimmerEnv = ctx.createGain();
+    const shimmerFilter = ctx.createBiquadFilter();
+    shimmer.buffer = buf;
+    shimmerFilter.type = 'highpass';
+    shimmerFilter.frequency.setValueAtTime(3000, shimmerStart);
+    shimmerFilter.frequency.linearRampToValueAtTime(8000, shimmerStart + 0.2);
+    shimmerEnv.gain.setValueAtTime(0.1, shimmerStart);
+    shimmerEnv.gain.exponentialRampToValueAtTime(0.001, shimmerStart + 0.2);
+    shimmer.connect(shimmerFilter);
+    shimmerFilter.connect(shimmerEnv);
+    shimmerEnv.connect(ctx.destination);
+    shimmer.start(shimmerStart);
+    shimmer.stop(shimmerStart + 0.2);
+  }
+
+  private setupEvents(): void {
+    const c = this.canvas;
+
+    c.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      this.initAudio();
+      const t = e.touches[0];
+      this.touchX = t.clientX;
+      // 상점 열려 있으면 상점 터치 처리
+      if (isShopOpen()) {
+        handleShopTap(t.clientX, t.clientY);
+        return;
+      }
+      if (this.state === GameState.START) {
+        this.state = GameState.PLAYING;
+        this.velY = JUMP_VELOCITY;
+        this.hasJumped = true;
+        this.touching = true;
+        this.startTime = performance.now();
+        this.startBGM();
+        if (\!areAdsRemoved()) showBanner();
+        return;
+      }
+      if (this.state === GameState.GAME_OVER) {
+        if (this.handleShopButtonTap(t.clientX, t.clientY)) return;
+        if (this.handleTabTap(t.clientX, t.clientY)) return;
+        if (this.handleReviveTap(t.clientX, t.clientY)) return;
+        this.resetGame();
+        this.state = GameState.START;
+        return;
+      }
+      this.touching = true;
+    });
+
+    c.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (\!this.touching || this.state \!== GameState.PLAYING) return;
+      this.touchX = e.touches[0].clientX;
+    });
+
+    c.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      this.touching = false;
+    });
+
+    c.addEventListener('mousedown', (e) => {
+      this.initAudio();
+      this.touchX = e.clientX;
+      // 상점 열려 있으면 상점 터치 처리
+      if (isShopOpen()) {
+        handleShopTap(e.clientX, e.clientY);
+        return;
+      }
+      if (this.state === GameState.START) {
+        this.state = GameState.PLAYING;
+        this.velY = JUMP_VELOCITY;
+        this.hasJumped = true;
+        this.touching = true;
+        this.startTime = performance.now();
+        this.startBGM();
+        if (\!areAdsRemoved()) showBanner();
+        return;
+      }
+      if (this.state === GameState.GAME_OVER) {
+        if (this.handleShopButtonTap(e.clientX, e.clientY)) return;
+        if (this.handleTabTap(e.clientX, e.clientY)) return;
+        if (this.handleReviveTap(e.clientX, e.clientY)) return;
+        this.resetGame();
+        this.state = GameState.START;
+        return;
+      }
+      this.touching = true;
+    });
+
+    c.addEventListener('mousemove', (e) => {
+      if (\!this.touching || this.state \!== GameState.PLAYING) return;
+      this.touchX = e.clientX;
+    });
+
+    c.addEventListener('mouseup', () => { this.touching = false; });
+  }
+
+  private update(): void {
+    if (this.state \!== GameState.PLAYING) return;
+
+    this.animTime += 0.05;
+
+    // 추락 중 중력 조절
+    if (this.velY > 0) {
+      const hasCarrotBelow = this.carrots.some(c =>
+        \!c.eaten &&
+        c.y > this.bunnyY &&
+        c.y - this.bunnyY <= MAX_CARROT_BELOW
+      );
+
+      if (hasCarrotBelow) {
+        // 아직 당근이 아래에 있음 - 원래 속도로 추락
+        this.velY = Math.min(this.velY + GRAVITY, MAX_FALL_SPEED);
+      } else {
+        // 당근이 정말로 없음 - 높이에 비례하여 급속 낙하
+        const fallDist = this.groundY - this.bunnyY;
+        if (fallDist > 3000) {
+          // 높은 곳에서 당근 없이 추락 → 즉시 게임 오버
+          this.bunnyY = this.groundY - BUNNY_RADIUS;
+          this.hasJumped = false;
+          this.gameOver();
+          return;
+        }
+        this.velY = Math.min(this.velY + GRAVITY * 6, MAX_FALL_SPEED * 4);
+      }
+    } else {
+      // 상승 중
+      this.velY = Math.min(this.velY + GRAVITY, MAX_FALL_SPEED);
+    }
+    this.bunnyY += this.velY;
+
+    if (this.touching) {
+      const targetX = clamp(this.touchX, BUNNY_RADIUS, this.w - BUNNY_RADIUS);
+      const move = (targetX - this.bunnyX) * 0.15;
+      this.bunnyX += move;
+      this.velX = move;
+    } else {
+      this.velX *= 0.85;
+      this.bunnyX += this.velX;
+    }
+    this.bunnyX = clamp(this.bunnyX, BUNNY_RADIUS, this.w - BUNNY_RADIUS);
+
+    if (this.velY < -2) {
+      this.bunnyPose = BunnyPose.JUMPING;
+      this.earBounce = Math.sin(this.animTime * 8) * 0.3;
+    } else if (this.velY > 2) {
+      this.bunnyPose = BunnyPose.FALLING;
+      this.earBounce = Math.sin(this.animTime * 4) * 0.15;
+    } else {
+      this.bunnyPose = BunnyPose.IDLE;
+      this.earBounce = Math.sin(this.animTime * 2) * 0.05;
+    }
+
+    this.targetCameraY = this.bunnyY;
+    this.cameraY += (this.targetCameraY - this.cameraY) * CAMERA_LERP;
+
+    this.heightReached = Math.max(this.heightReached, this.groundY - this.bunnyY);
+
+    if (this.hasJumped && this.bunnyY >= this.groundY - BUNNY_RADIUS) {
+      this.bunnyY = this.groundY - BUNNY_RADIUS;
+      this.hasJumped = false;
+      this.gameOver();
+      return;
+    }
+
+    const maxFallY = this.bunnyY + MAX_CARROT_BELOW;
+
+    for (const c of this.carrots) {
+      if (c.eaten) continue;
+      c.y += c.vy;
+      if (c.y > maxFallY) {
+        c.eaten = true;
+      }
+    }
+
+    this.carrots = this.carrots.filter(c => \!c.eaten);
+
+    // Extend carrot pool upward as bunny climbs
+    this.extendCarrotPool();
+
+    for (const c of this.carrots) {
+      if (c.eaten) continue;
+      // Only collide when bunny is falling (velY > 0) and approaching from above
+      if (this.velY <= 0) continue;
+      if (this.bunnyY > c.y + CARROT_HIT_RADIUS) continue;
+      const dx = this.bunnyX - c.x;
+      const dy = this.bunnyY - c.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < BUNNY_RADIUS + CARROT_HIT_RADIUS) {
+        c.eaten = true;
+        this.onCarrotEaten(c);
+      }
+    }
+
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const p = this.particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.15;
+      p.life--;
+      if (p.life <= 0) {
+        this.particles.splice(i, 1);
+      }
+    }
+
+    // Update score bounce animation (decay toward 1.0)
+    if (this.scoreBounce > 1.0) {
+      this.scoreBounce += (1.0 - this.scoreBounce) * 0.12;
+      if (this.scoreBounce < 1.02) this.scoreBounce = 1.0;
+    }
+
+    // Update score popups
+    for (let i = this.scorePopups.length - 1; i >= 0; i--) {
+      const p = this.scorePopups[i];
+      p.y -= 1.2;
+      p.life--;
+      if (p.life <= 0) {
+        this.scorePopups.splice(i, 1);
+      }
+    }
+
+    if (this.shakeTimer > 0) this.shakeTimer--;
+
+    for (const cl of this.clouds) {
+      cl.x += cl.speed * cl.z;
+      if (cl.x > this.w + cl.width) cl.x = -cl.width;
+    }
+  }
+
+  private onCarrotEaten(c: Carrot): void {
+    if (c.type === CarrotType.NORMAL) {
+      achOnCarrotEaten('normal');
+      if (this.goldenBuffActive) {
+        this.velY = JUMP_VELOCITY * 1.5;
+        this.goldenBuffActive = false;
+        this.score += 1;
+        this.scoreBounce = 2.0;
+        this.scoreColor = '#FFD700';
+        this.spawnParticles(c.x, c.y, '#FF6B35', 8);
+        this.spawnParticles(c.x, c.y, '#FFD700', 6);
+        this.shakeTimer = 4;
+        this.scorePopups.push({
+          text: '+1 BUFF', x: c.x, y: c.y,
+          life: 45, maxLife: 45, scale: 1.8, color: '#FFD700',
+        });
+      } else {
+        this.velY = JUMP_VELOCITY;
+        this.score += 1;
+        this.scoreBounce = 1.5;
+        this.scoreColor = '#FFF';
+        this.spawnParticles(c.x, c.y, '#FF6B35', 8);
+        this.scorePopups.push({
+          text: '+1', x: c.x, y: c.y,
+          life: 40, maxLife: 40, scale: 1.5, color: '#FF6B35',
+        });
+      }
+      this.playCarrotSound();
+    } else if (c.type === CarrotType.SPECIAL) {
+      achOnCarrotEaten('special');
+      this.velY = JUMP_VELOCITY * 2;
+      this.score += 2;
+      this.goldenBuffActive = true;
+      this.scoreBounce = 2.0;
+      this.scoreColor = '#FFD700';
+      this.shakeTimer = 6;
+      this.spawnParticles(c.x, c.y, '#FFD700', 14);
+      this.scorePopups.push({
+        text: '+2 GOLD', x: c.x, y: c.y,
+        life: 50, maxLife: 50, scale: 2.0, color: '#FFD700',
+      });
+      this.playGoldenCarrotSound();
+    }
+  }
+
+  private spawnParticles(x: number, y: number, color: string, count: number): void {
+    for (let i = 0; i < count; i++) {
+      this.particles.push({
+        x,
+        y,
+        vx: rand(-4, 4),
+        vy: rand(-5, 1),
+        life: 35,
+        maxLife: 35,
+        color,
+        radius: rand(2, 6),
+      });
+    }
+  }
+
+  private gameOver(): void {
+    this.state = GameState.GAME_OVER;
+    this.saveBest();
+    this.stopBGM();
+    hideBanner();
+
+    // 업적 체크
+    achOnGameOver(this.score, Math.floor(this.heightReached));
+    // 달성된 업적 팝업 큐
+    const completed = popRecentlyCompleted();
+    for (const ach of completed) {
+      queueAchievementPopup(ach);
+    }
+
+    // 부활 가능 여부: 이번 게임에서 아직 부활 안 했고, (리워드 광고 준비됨 또는 광고 제거 구매자)
+    this.reviveAvailable = \!this.hasUsedRevive && (isRewardedReady() || areAdsRemoved());
+
+    // 전면 광고 표시 (N회 게임 오버마다, 광고 제거 시 스킵)
+    if (\!areAdsRemoved()) showInterstitialOnGameOver();
+
+    // Submit score first, then fetch rankings (프로필 모달 완료 후)
+    const heightMm = Math.floor(this.heightReached);
+    this.rankingTab = 'all';
+    (async () => {
+      // Prompt profile setup once (persisted to localStorage)
+      if (\!localStorage.getItem('bh_profile_set')) {
+        localStorage.setItem('bh_profile_set', '1');
+        await showProfileModal();
+      }
+      await this.submitAndLoadRankings(heightMm);
+    })();
+  }
+
+  private async submitAndLoadRankings(heightMm: number): Promise<void> {
+    await submitScore({ score: this.score, height: heightMm });
+    invalidateCache(); // 점수 제출 후 캐시 무효화하여 최신 랭킹 반영
+    await this.loadRankings();
+  }
+
+  private async loadRankings(): Promise<void> {
+    const entries = await fetchRanking(this.rankingTab);
+    this.rankings = entries.filter(e => e.rank <= 10);
+    this.myRank = entries.find(e => e.is_me && e.rank > 10) || null;
+  }
+
+  private worldToScreen(worldY: number): number {
+    return worldY - this.cameraY + this.h / 2;
+  }
+
+  private perspectiveScale(worldY: number): number {
+    const distFromBunny = Math.abs(worldY - this.bunnyY);
+    return clamp(1.0 - distFromBunny * 0.00008, 0.7, 1.0);
+  }
+
+  private lastTime = 0;
+  private loop(time: number): void {
+    if (this.lastTime === 0) this.lastTime = time;
+    const dt = time - this.lastTime;
+    this.lastTime = time;
+
+    if (dt < 100) {
+      this.update();
+    }
+
+    this.render();
+    requestAnimationFrame((t) => this.loop(t));
+  }
