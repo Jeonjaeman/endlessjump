@@ -9,6 +9,7 @@ import { initIAP } from './services/iap-service';
 import { initSkins, getCurrentSkinColors } from './services/skin-service';
 import { initAchievements, onGameOver as achOnGameOver, onCarrotEaten as achOnCarrotEaten, popRecentlyCompleted } from './services/achievement-service';
 import { isShopOpen, openShop, closeShop, handleShopTap, renderShop, renderShopButton, getShopButtonArea, renderAchievementPopup, queueAchievementPopup, clearAchievementPopups } from './ui/shop-screen';
+import { SkyRenderer } from './sky-renderer';
 
 const GRAVITY = 0.6;
 const JUMP_VELOCITY = -15;
@@ -113,6 +114,9 @@ export class Game {
   private hasUsedRevive = false;
   private reviveAvailable = false;
 
+  // Sky renderer (WebGL)
+  private skyRenderer = new SkyRenderer();
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     const ctx = canvas.getContext('2d');
@@ -153,11 +157,14 @@ export class Game {
 
   private resize(): void {
     const dpr = window.devicePixelRatio || 1;
-    this.w = window.innerWidth;
-    this.h = window.innerHeight;
+    // body safe-area padding 반영된 캔버스 실제 크기 사용
+    const rect = this.canvas.getBoundingClientRect();
+    this.w = rect.width;
+    this.h = rect.height;
     this.canvas.width = this.w * dpr;
     this.canvas.height = this.h * dpr;
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.skyRenderer.resize(this.w * dpr, this.h * dpr);
     // PLAYING 상태에서는 groundY 변경하지 않기 (부활/게임 중 좌표 꼬임 방지)
     if (this.state !== GameState.PLAYING) {
       this.groundY = this.h * 10;
@@ -802,23 +809,31 @@ export class Game {
     // 전면 광고 표시 (N회 게임 오버마다, 광고 제거 시 스킵)
     if (!areAdsRemoved()) showInterstitialOnGameOver();
 
-    // Submit score first, then fetch rankings (프로필 모달 완료 후)
-    const heightMm = Math.floor(this.heightReached);
+    // 랭킹 UI 초기화 (이전 게임 데이터 잔상 방지)
+    this.rankings = [];
+    this.myRank = null;
     this.rankingTab = 'all';
-    (async () => {
-      // Prompt profile setup once (persisted to localStorage)
-      if (!localStorage.getItem('bh_profile_set')) {
-        localStorage.setItem('bh_profile_set', '1');
-        await showProfileModal();
-      }
-      await this.submitAndLoadRankings(heightMm);
-    })().catch((e) => {
+
+    // async 클로저 전에 값 캡처 (상태 변경에 의한 경합 방지)
+    const capturedScore = this.score;
+    const capturedHeightMm = Math.floor(this.heightReached);
+
+    // 점수 제출 + 랭킹 로드 먼저 실행 (스코어/랭킹 우선 표시)
+    this.submitAndLoadRankings(capturedHeightMm, capturedScore).catch((e) => {
       console.warn('[Game] 점수 제출/랭킹 로드 실패:', e);
     });
+
+    // 프로필 모달은 fire-and-forget 병렬 실행
+    if (!localStorage.getItem('bh_profile_set')) {
+      localStorage.setItem('bh_profile_set', '1');
+      showProfileModal().catch((e) => {
+        console.warn('[Game] 프로필 모달 표시 실패:', e);
+      });
+    }
   }
 
-  private async submitAndLoadRankings(heightMm: number): Promise<void> {
-    await submitScore({ score: this.score, height: heightMm });
+  private async submitAndLoadRankings(heightMm: number, score: number): Promise<void> {
+    await submitScore({ score, height: heightMm });
     invalidateCache(); // 점수 제출 후 캐시 무효화하여 최신 랭킹 반영
     await this.loadRankings();
   }
@@ -915,12 +930,15 @@ export class Game {
   }
 
   private renderBackground(ctx: CanvasRenderingContext2D): void {
-    const [top, bottom] = this.getSkyColors();
-    const grad = ctx.createLinearGradient(0, 0, 0, this.h);
-    grad.addColorStop(0, top);
-    grad.addColorStop(1, bottom);
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, this.w, this.h);
+    const elapsed = this.state === GameState.PLAYING
+      ? (performance.now() - this.startTime)
+      : 0;
+    // 비플레이 상태에서는 밤하늘(0.4)을 기본으로 표시
+    const cycle = this.state === GameState.PLAYING
+      ? (elapsed % DAY_CYCLE_MS) / DAY_CYCLE_MS
+      : 0.4;
+    const timeSec = performance.now() * 0.001;
+    this.skyRenderer.render(ctx, this.w, this.h, timeSec, cycle, this.heightReached);
   }
 
   private renderClouds3D(ctx: CanvasRenderingContext2D): void {
