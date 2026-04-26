@@ -37,19 +37,19 @@ export function renderRankingScreen(
   ctx.fillText('Game Over!', cx, startY + 30);
   ctx.shadowBlur = 0;
 
-  // Current score — centered block
+  // Current height — centered block
   ctx.fillStyle = '#FFF';
   ctx.font = 'bold 24px sans-serif';
-  ctx.fillText(`Score: ${score}`, cx, startY + 66);
+  ctx.fillText(`${heightMm}mm`, cx, startY + 66);
 
   ctx.fillStyle = 'rgba(255,255,255,0.6)';
   ctx.font = '14px sans-serif';
-  ctx.fillText(`Height: ${heightMm}mm`, cx, startY + 86);
+  ctx.fillText(`Carrots: ${score}`, cx, startY + 86);
 
-  // Best score
+  // Best record
   ctx.fillStyle = '#FFD700';
   ctx.font = '13px sans-serif';
-  ctx.fillText(`Best: ${bestScore} pts / ${bestHeight}mm`, cx, startY + 106);
+  ctx.fillText(`Best: ${bestHeight}mm / ${bestScore} carrots`, cx, startY + 106);
 
   // Tab buttons
   const tabY = startY + 120;
@@ -78,7 +78,7 @@ export function renderRankingScreen(
   ctx.fillText('#', listX + 8, listY);
   ctx.fillText('Player', listX + 50, listY);
   ctx.textAlign = 'right';
-  ctx.fillText('Score', listX + listW - 8, listY);
+  ctx.fillText('Height', listX + listW - 8, listY);
 
   const top10 = rankings.filter(r => r.rank <= 10);
 
@@ -120,7 +120,7 @@ export function renderRankingScreen(
     ctx.textAlign = 'right';
     ctx.fillStyle = entry.is_me ? '#FFD700' : 'rgba(255,255,255,0.8)';
     ctx.font = entry.is_me ? 'bold 14px sans-serif' : '14px sans-serif';
-    ctx.fillText(`${entry.score}`, listX + listW - 8, ry + 12);
+    ctx.fillText(`${entry.height}mm`, listX + listW - 8, ry + 12);
   }
 
   // My rank if outside top 10
@@ -151,7 +151,7 @@ export function renderRankingScreen(
 
     ctx.textAlign = 'right';
     ctx.fillStyle = '#FFD700';
-    ctx.fillText(`${myRank.score}`, listX + listW - 8, myRowY + 12);
+    ctx.fillText(`${myRank.height}mm`, listX + listW - 8, myRowY + 12);
   }
 
   // Revive button (리워드 광고로 부활)

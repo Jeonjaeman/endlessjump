@@ -34,13 +34,13 @@ interface HeightZone {
 }
 
 function getZone(height: number): HeightZone {
-  if (height < 500) return { minGap: 30, maxGap: 50, specialChance: 0.15 };
-  if (height < 1000) return { minGap: 40, maxGap: 60, specialChance: 0.15 };
-  if (height < 1500) return { minGap: 50, maxGap: 80, specialChance: 0.17 };
-  if (height < 3000) return { minGap: 80, maxGap: 120, specialChance: 0.19 };
-  if (height < 5000) return { minGap: 120, maxGap: 180, specialChance: 0.21 };
-  if (height < 8000) return { minGap: 180, maxGap: 250, specialChance: 0.23 };
-  return { minGap: 250, maxGap: 350, specialChance: 0.25 };
+  if (height < 2000) return { minGap: 30, maxGap: 50, specialChance: 0.15 };
+  if (height < 5000) return { minGap: 40, maxGap: 65, specialChance: 0.15 };
+  if (height < 8000) return { minGap: 55, maxGap: 85, specialChance: 0.17 };
+  if (height < 12000) return { minGap: 70, maxGap: 110, specialChance: 0.18 };
+  if (height < 20000) return { minGap: 90, maxGap: 150, specialChance: 0.20 };
+  if (height < 35000) return { minGap: 130, maxGap: 210, specialChance: 0.22 };
+  return { minGap: 200, maxGap: 300, specialChance: 0.25 };
 }
 
 function rand(min: number, max: number): number {
@@ -217,14 +217,15 @@ export class Game {
   }
 
   private saveBest(): void {
-    if (this.score > this.bestScore) {
-      this.bestScore = this.score;
-      localStorage.setItem('bh_bestScore', String(this.bestScore));
-    }
     const hMm = Math.floor(this.heightReached);
-    if (hMm > this.bestHeight) {
+    // 높이 우선, 동점 시 당근 수로 비교
+    const isNewBest = hMm > this.bestHeight ||
+      (hMm === this.bestHeight && this.score > this.bestScore);
+    if (isNewBest) {
       this.bestHeight = hMm;
+      this.bestScore = this.score;
       localStorage.setItem('bh_bestHeight', String(this.bestHeight));
+      localStorage.setItem('bh_bestScore', String(this.bestScore));
     }
   }
 
@@ -280,8 +281,8 @@ export class Game {
       const zone = getZone(height);
 
       // Zone 레벨에 따라 safeMaxGap 조정
-      const zoneLevel = height < 500 ? 0 : height < 1000 ? 1 : height < 1500 ? 2
-        : height < 3000 ? 3 : height < 5000 ? 4 : height < 8000 ? 5 : 6;
+      const zoneLevel = height < 2000 ? 0 : height < 5000 ? 1 : height < 8000 ? 2
+        : height < 12000 ? 3 : height < 20000 ? 4 : height < 35000 ? 5 : 6;
       const safeMaxGap = NORMAL_JUMP_PEAK * (0.75 + zoneLevel * 0.05);
 
       // Clamp zone gaps to safe bounds so bunny can always reach the next carrot

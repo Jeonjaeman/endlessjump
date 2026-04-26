@@ -652,7 +652,7 @@ export function renderHUD(ctx: CanvasRenderingContext2D, rs: RenderState): void 
   ctx.closePath();
   ctx.fill();
 
-  // Score with bounce animation
+  // Height (primary) with bounce animation
   ctx.save();
   const scoreTextX = 20;
   const scoreTextY = 36;
@@ -663,12 +663,12 @@ export function renderHUD(ctx: CanvasRenderingContext2D, rs: RenderState): void 
   ctx.fillStyle = rs.scoreColor;
   ctx.font = 'bold 18px sans-serif';
   ctx.textAlign = 'left';
-  ctx.fillText(`Score: ${rs.score}`, scoreTextX, scoreTextY);
+  ctx.fillText(`${heightMm}mm`, scoreTextX, scoreTextY);
   ctx.restore();
 
   ctx.font = '14px sans-serif';
   ctx.fillStyle = '#CCC';
-  ctx.fillText(`Height: ${heightMm}mm`, 20, 58);
+  ctx.fillText(`Carrots: ${rs.score}`, 20, 58);
 
   // Score popups (floating +1, +2 GOLD text)
   for (const p of rs.scorePopups) {
@@ -706,9 +706,9 @@ export function renderStartScreen(ctx: CanvasRenderingContext2D, w: number, h: n
   ctx.fillStyle = 'rgba(255,255,255,0.8)';
   ctx.fillText('Tap to Start', w / 2, h / 3 + 50);
 
-  if (bestScore > 0) {
+  if (bestHeight > 0) {
     ctx.font = '16px sans-serif';
     ctx.fillStyle = '#FFD700';
-    ctx.fillText(`BEST: ${bestScore} pts / ${bestHeight}mm`, w / 2, h / 3 + 90);
+    ctx.fillText(`BEST: ${bestHeight}mm / ${bestScore} carrots`, w / 2, h / 3 + 90);
   }
 }
