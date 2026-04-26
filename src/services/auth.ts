@@ -101,8 +101,7 @@ export async function linkGoogleAccount(): Promise<boolean> {
       options: { redirectTo: window.location.origin },
     });
     if (error || !data) return false;
-    // OAuth redirect 진행 — 복귀 후 initAuth의 getSession에서 linked 감지
-    localStorage.setItem(LINKED_KEY, '1');
+    // OAuth redirect 진행 — 복귀 후 initAuth의 getSession에서 linked 감지 + LINKED_KEY 설정
     return true;
   } catch {
     return false;

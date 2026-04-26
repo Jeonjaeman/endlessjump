@@ -67,11 +67,13 @@ class SkinAssetLoaderImpl {
 
     const spriteSet: SkinSpriteSet = { idle, jump, fall, itemNormal, itemSpecial, thumb };
 
-    // Evict oldest when cache grows beyond 2
+    // Evict oldest when cache grows beyond 2 (never evict current skin)
     if (this.cache.size >= 2) {
-      const oldest = this.loadOrder.shift();
-      if (oldest) {
-        this.cache.delete(oldest);
+      const evictIdx = this.loadOrder.findIndex(id => id !== this.currentSkinId);
+      if (evictIdx >= 0) {
+        const evictId = this.loadOrder[evictIdx];
+        this.loadOrder.splice(evictIdx, 1);
+        this.cache.delete(evictId);
       }
     }
 

@@ -30,6 +30,14 @@ export const PRODUCT_SKIN_PACK_JUNGLE_KING = 'bunnyhop_skin_jungle_king';
 export const PRODUCT_SKIN_PACK_CLAW_FIGHTER = 'bunnyhop_skin_claw_fighter';
 export const PRODUCT_SKIN_PACK_SPACE_EXPLORER = 'bunnyhop_skin_space_explorer';
 
+const ALL_SKIN_PRODUCTS = [
+  PRODUCT_SKIN_PACK_PINK, PRODUCT_SKIN_PACK_GOLDEN, PRODUCT_SKIN_PACK_SHADOW,
+  PRODUCT_SKIN_PACK_SHADOW_NINJA, PRODUCT_SKIN_PACK_OCEAN_PIRATE,
+  PRODUCT_SKIN_PACK_METAL_HERO, PRODUCT_SKIN_PACK_THUNDER_GUARDIAN,
+  PRODUCT_SKIN_PACK_JUNGLE_KING, PRODUCT_SKIN_PACK_CLAW_FIGHTER,
+  PRODUCT_SKIN_PACK_SPACE_EXPLORER,
+];
+
 // ── 상품 목록 (표시용 기본값 — 실제 가격은 스토어에서 가져옴) ─
 const DEFAULT_PRODUCTS: IAPProduct[] = [
   {
@@ -147,7 +155,7 @@ async function syncPurchases(): Promise<void> {
     }
 
     // 스킨 팩들
-    for (const skinId of [PRODUCT_SKIN_PACK_PINK, PRODUCT_SKIN_PACK_GOLDEN, PRODUCT_SKIN_PACK_SHADOW]) {
+    for (const skinId of ALL_SKIN_PRODUCTS) {
       if (entitlements[skinId]) {
         purchasedProducts.add(skinId);
       }
@@ -217,7 +225,7 @@ export async function restorePurchases(): Promise<boolean> {
       restored = true;
     }
 
-    for (const skinId of [PRODUCT_SKIN_PACK_PINK, PRODUCT_SKIN_PACK_GOLDEN, PRODUCT_SKIN_PACK_SHADOW]) {
+    for (const skinId of ALL_SKIN_PRODUCTS) {
       if (entitlements[skinId]) {
         purchasedProducts.add(skinId);
         restored = true;

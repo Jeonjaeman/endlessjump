@@ -12,9 +12,7 @@ async function bootstrap(): Promise<void> {
   initSkins();
   const selectedId = getSelectedSkinId();
   const spriteDir = getSkinSpriteDir(selectedId);
-  if (spriteDir) {
-    skinAssetLoader.setCurrentSkin(selectedId);
-  }
+  skinAssetLoader.setCurrentSkin(selectedId);
 
   await Promise.all([
     assetManager.load((p) => {

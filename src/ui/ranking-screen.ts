@@ -230,8 +230,9 @@ export function getLinkHitArea(w: number, h: number, reviveAvailable: boolean): 
 
 export function getTabHitArea(w: number, h: number): { allTab: DOMRect; weeklyTab: DOMRect } {
   const cx = w / 2;
+  const safeTop = 40;
   const contentH = 500;
-  const startY = Math.max(10, (h - contentH) / 2 - 20);
+  const startY = Math.max(safeTop, (h - contentH) / 2);
   const tabY = startY + 120;
   const tabW = 90;
   const tabH = 30;

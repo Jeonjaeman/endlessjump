@@ -696,7 +696,7 @@ export class Game {
     const btn = getLinkHitArea(this.w, this.h, this.reviveAvailable);
     if (x >= btn.x && x <= btn.x + btn.width &&
         y >= btn.y && y <= btn.y + btn.height) {
-      linkGoogleAccount();
+      linkGoogleAccount().catch((e) => console.warn('[Game] Google 연결 실패:', e));
       return true;
     }
     return false;
