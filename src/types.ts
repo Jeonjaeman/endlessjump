@@ -97,7 +97,6 @@ export interface Achievement {
   target: number;
   current: number;
   completed: boolean;
-  reward: number;
   type: 'daily' | 'permanent';
 }
 

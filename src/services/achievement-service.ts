@@ -2,7 +2,7 @@
  * 일일 업적 시스템
  *
  * - 일일 업적 5개 (매일 자정 리셋)
- * - 달성 여부 추적 + 보상(코인) 처리
+ * - 달성 여부 추적
  * - localStorage로 저장/로드
  * - game.ts에서 이벤트 발생 시 체크
  */
@@ -11,7 +11,6 @@ import type { Achievement } from '../types';
 
 // ── localStorage 키 ──────────────────────────────────────────
 const STORAGE_KEY_ACHIEVEMENTS = 'bh_achievements';
-const STORAGE_KEY_COINS = 'bh_coins';
 const STORAGE_KEY_LAST_RESET = 'bh_achievement_reset_date';
 
 // ── 일일 업적 템플릿 ────────────────────────────────────────
@@ -25,7 +24,7 @@ function createDailyAchievements(): Achievement[] {
       target: 50,
       current: 0,
       completed: false,
-      reward: 10,
+
       type: 'daily',
     },
     {
@@ -36,7 +35,7 @@ function createDailyAchievements(): Achievement[] {
       target: 1000,
       current: 0,
       completed: false,
-      reward: 10,
+
       type: 'daily',
     },
     {
@@ -47,7 +46,7 @@ function createDailyAchievements(): Achievement[] {
       target: 3,
       current: 0,
       completed: false,
-      reward: 15,
+
       type: 'daily',
     },
     {
@@ -58,7 +57,7 @@ function createDailyAchievements(): Achievement[] {
       target: 5,
       current: 0,
       completed: false,
-      reward: 10,
+
       type: 'daily',
     },
     {
@@ -69,7 +68,7 @@ function createDailyAchievements(): Achievement[] {
       target: 100,
       current: 0,
       completed: false,
-      reward: 20,
+
       type: 'daily',
     },
   ];
@@ -77,7 +76,6 @@ function createDailyAchievements(): Achievement[] {
 
 // ── 상태 ────────────────────────────────────────────────────
 let achievements: Achievement[] = [];
-let coins = 0;
 
 /** 최근 달성된 업적 (팝업 표시용) */
 let recentlyCompleted: Achievement[] = [];
@@ -97,7 +95,6 @@ function shouldResetDaily(): boolean {
 function save(): void {
   try {
     localStorage.setItem(STORAGE_KEY_ACHIEVEMENTS, JSON.stringify(achievements));
-    localStorage.setItem(STORAGE_KEY_COINS, String(coins));
     localStorage.setItem(STORAGE_KEY_LAST_RESET, getTodayString());
   } catch {
     // localStorage 접근 실패 시 무시
@@ -106,8 +103,6 @@ function save(): void {
 
 function load(): void {
   try {
-    coins = parseInt(localStorage.getItem(STORAGE_KEY_COINS) || '0', 10);
-
     if (shouldResetDaily()) {
       // 일일 업적 리셋
       achievements = createDailyAchievements();
@@ -123,7 +118,6 @@ function load(): void {
     }
   } catch {
     achievements = createDailyAchievements();
-    coins = 0;
   }
 }
 
@@ -135,11 +129,6 @@ export function initAchievements(): void {
 // ── 업적 목록 조회 ──────────────────────────────────────────
 export function getAchievements(): Achievement[] {
   return achievements;
-}
-
-// ── 코인 조회 ───────────────────────────────────────────────
-export function getCoins(): number {
-  return coins;
 }
 
 // ── 최근 달성 업적 팝업 가져오기 (가져온 뒤 비움) ────────────
@@ -158,7 +147,6 @@ function updateProgress(id: string, value: number): void {
 
   if (ach.current >= ach.target) {
     ach.completed = true;
-    coins += ach.reward;
     recentlyCompleted.push({ ...ach });
   }
 

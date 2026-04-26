@@ -9,7 +9,7 @@
 
 import { getProducts, purchaseProduct, restorePurchases, isProductPurchased, isAdsRemoved } from '../services/iap-service';
 import { getSkins, selectSkin, getSelectedSkinId, getSkinUnlockInfo, getSkinSpriteDir } from '../services/skin-service';
-import { getAchievements, getCoins } from '../services/achievement-service';
+import { getAchievements } from '../services/achievement-service';
 import { skinAssetLoader } from '../skin-assets';
 import { assetManager } from '../assets';
 import type { BunnySkin, Achievement } from '../types';
@@ -187,15 +187,11 @@ export function renderShop(ctx: CanvasRenderingContext2D, w: number, h: number):
   roundRect(ctx, panelX, panelY, panelW, panelH, 16);
   ctx.stroke();
 
-  // 제목 + 코인
+  // 제목
   ctx.fillStyle = '#FFF';
   ctx.font = 'bold 22px sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText('상점', w / 2, panelY + 36);
-
-  ctx.fillStyle = '#FFD700';
-  ctx.font = '14px sans-serif';
-  ctx.fillText(`🪙 ${getCoins()} 코인`, w / 2, panelY + 56);
 
   // 닫기 버튼
   const closeSize = 30;
@@ -577,10 +573,12 @@ function renderAchievementsTab(ctx: CanvasRenderingContext2D, x: number, y: numb
     ctx.textAlign = 'right';
     ctx.fillText(`${ach.current}/${ach.target}`, x + w - 10, ry + 22);
 
-    // 보상
-    ctx.fillStyle = '#FFD700';
-    ctx.font = '10px sans-serif';
-    ctx.fillText(`🪙${ach.reward}`, x + w - 10, ry + 38);
+    // 달성 표시
+    if (ach.completed) {
+      ctx.fillStyle = '#4CAF50';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText('달성!', x + w - 10, ry + 38);
+    }
   });
 }
 
@@ -671,7 +669,7 @@ export function renderAchievementPopup(ctx: CanvasRenderingContext2D, w: number,
 
   ctx.font = '12px sans-serif';
   ctx.fillStyle = 'rgba(255,255,255,0.8)';
-  ctx.fillText(`${currentPopup.name} — 🪙${currentPopup.reward}`, popX + 42, popY + 38);
+  ctx.fillText(currentPopup.name, popX + 42, popY + 38);
 
   ctx.restore();
 }
