@@ -479,6 +479,7 @@ export class Game {
           life: 40, maxLife: 40, scale: 1.5, color: '#FF6B35',
         });
       }
+      this.audio.playJumpSound();
       this.audio.playCarrotSound();
     } else if (c.type === CarrotType.SPECIAL) {
       achOnCarrotEaten('special');
@@ -493,6 +494,7 @@ export class Game {
         text: '+2 GOLD', x: c.x, y: c.y,
         life: 50, maxLife: 50, scale: 2.0, color: '#FFD700',
       });
+      this.audio.playJumpSound();
       this.audio.playGoldenCarrotSound();
     }
   }
@@ -515,6 +517,7 @@ export class Game {
   private gameOver(): void {
     this.state = GameState.GAME_OVER;
     this.saveBest();
+    this.audio.playGameOverSound();
     this.audio.stopBGM();
     hideBanner();
 
