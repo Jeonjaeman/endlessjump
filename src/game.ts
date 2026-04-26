@@ -20,7 +20,7 @@ const JUMP_VELOCITY = -15;
 const MAX_FALL_SPEED = 12;
 const BUNNY_RADIUS = 18;
 const CARROT_RADIUS = 14;
-const CARROT_HIT_RADIUS = 22;
+const CARROT_HIT_RADIUS = 16;
 const CAMERA_LERP = 0.08;
 const CARROT_FALL_SPEED = 0.4;
 const MAX_CARROT_BELOW = 2000;
@@ -370,7 +370,9 @@ export class Game {
     }
 
     this.targetCameraY = this.bunnyY;
-    this.cameraY += (this.targetCameraY - this.cameraY) * CAMERA_LERP;
+    // 낙하 시 카메라를 더 빠르게 추적 → 충돌 위치와 화면 위치 일치
+    const lerpSpeed = this.velY > 2 ? 0.18 : CAMERA_LERP;
+    this.cameraY += (this.targetCameraY - this.cameraY) * lerpSpeed;
 
     this.heightReached = Math.max(this.heightReached, this.groundY - this.bunnyY);
 
@@ -399,15 +401,17 @@ export class Game {
     for (const c of this.carrots) {
       if (c.eaten) continue;
       // 낙하 중이거나 점프 정점 근처에서만 충돌 (강하게 상승 중에는 통과)
-      if (this.velY < -2) continue;
-      // 토끼가 당근보다 너무 아래이면 무시
-      if (this.bunnyY > c.y + CARROT_HIT_RADIUS) continue;
-      const dx = this.bunnyX - c.x;
-      // 충돌 판정은 토끼 발 위치(중심 + 반지름의 절반) 기준
-      const feetY = this.bunnyY + BUNNY_RADIUS * 0.5;
-      const dy = feetY - c.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < BUNNY_RADIUS + CARROT_HIT_RADIUS) {
+      if (this.velY < -1) continue;
+      // 토끼 발 위치 (중심 + 반지름)
+      const feetY = this.bunnyY + BUNNY_RADIUS;
+      // 토끼 발이 당근 상단보다 아래에 있어야 밟기 판정
+      const carrotTop = c.y - CARROT_HIT_RADIUS;
+      if (feetY < carrotTop) continue;
+      // 토끼가 당근 중심보다 너무 아래이면 무시 (옆에서 스치는 것 방지)
+      if (feetY > c.y + CARROT_HIT_RADIUS) continue;
+      // 수평 거리 체크
+      const dx = Math.abs(this.bunnyX - c.x);
+      if (dx < BUNNY_RADIUS + CARROT_HIT_RADIUS) {
         c.eaten = true;
         this.onCarrotEaten(c);
       }
