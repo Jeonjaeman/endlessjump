@@ -32,8 +32,8 @@ CREATE OR REPLACE FUNCTION get_ranking(
 )
 RETURNS TABLE (
   rank BIGINT,
-  score BIGINT,
-  height BIGINT,
+  score INTEGER,
+  height INTEGER,
   nickname TEXT,
   country_code TEXT,
   user_id UUID,
