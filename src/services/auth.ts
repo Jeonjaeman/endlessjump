@@ -3,6 +3,7 @@ import { flushQueue } from './offline-queue';
 
 const LOCAL_UUID_KEY = 'bh_local_uuid';
 const PROFILE_KEY = 'bh_profile';
+const LINKED_KEY = 'bh_account_linked';
 
 export interface LocalProfile {
   nickname: string;
@@ -45,14 +46,31 @@ export async function initAuth(): Promise<string | null> {
   if (!sb) return null;
 
   try {
-    // Check existing session
+    // Check existing session (Google or anonymous)
     const { data: { session } } = await sb.auth.getSession();
     if (session?.user) {
       supabaseUserId = session.user.id;
+      // Google 연결 상태 감지
+      if (session.user.app_metadata?.provider === 'google'
+          || (session.user.identities ?? []).some((i: any) => i.provider === 'google')) {
+        localStorage.setItem(LINKED_KEY, '1');
+      }
       await ensureProfile();
-      // 기존 세션 복원 시에도 오프라인 큐 플러시
       flushQueue();
       return supabaseUserId;
+    }
+
+    // 이전에 Google 연결했으면 Google 로그인 시도
+    if (localStorage.getItem(LINKED_KEY) === '1') {
+      const { data, error } = await sb.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin },
+      });
+      if (!error && data) {
+        // OAuth redirect 진행 — 페이지 리로드 후 위의 getSession에서 세션 복원
+        return null;
+      }
+      // Google 로그인 실패 시 익명으로 폴백
     }
 
     // Anonymous sign-in
@@ -61,11 +79,33 @@ export async function initAuth(): Promise<string | null> {
 
     supabaseUserId = data.user.id;
     await ensureProfile();
-    // 앱 시작 시 오프라인 큐 플러시
     flushQueue();
     return supabaseUserId;
   } catch {
     return null;
+  }
+}
+
+// ── Google 계정 연결 ─────────────────────────────────────────
+export function isAccountLinked(): boolean {
+  return localStorage.getItem(LINKED_KEY) === '1';
+}
+
+export async function linkGoogleAccount(): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb) return false;
+
+  try {
+    const { data, error } = await sb.auth.linkIdentity({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    });
+    if (error || !data) return false;
+    // OAuth redirect 진행 — 복귀 후 initAuth의 getSession에서 linked 감지
+    localStorage.setItem(LINKED_KEY, '1');
+    return true;
+  } catch {
+    return false;
   }
 }
 

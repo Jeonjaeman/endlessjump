@@ -1,5 +1,6 @@
 import type { RankEntry } from '../types';
 import { getFlagEmoji } from './profile-modal';
+import { isAccountLinked } from '../services/auth';
 
 const MEDAL_COLORS = ['#FFD700', '#C0C0C0', '#CD7F32']; // gold, silver, bronze
 
@@ -184,6 +185,24 @@ export function renderRankingScreen(
     ctx.fillText('🎬 광고 보고 이어하기', cx, btnY + btnH / 2 + 6);
   }
 
+  // Google 연결 배너 (미연결 시)
+  if (!isAccountLinked()) {
+    const linkBtnW = 240;
+    const linkBtnH = 36;
+    const linkBtnX = cx - linkBtnW / 2;
+    const linkBtnY = reviveAvailable ? h - 145 : h - 90;
+
+    ctx.fillStyle = 'rgba(66,133,244,0.85)';
+    ctx.beginPath();
+    roundRect(ctx, linkBtnX, linkBtnY, linkBtnW, linkBtnH, 8);
+    ctx.fill();
+
+    ctx.fillStyle = '#FFF';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('G  Google로 기록 영구 저장', cx, linkBtnY + linkBtnH / 2 + 5);
+  }
+
   // Tap to restart
   ctx.fillStyle = 'rgba(255,255,255,0.6)';
   ctx.font = '16px sans-serif';
@@ -198,6 +217,15 @@ export function getReviveHitArea(w: number, h: number): DOMRect {
   const btnX = cx - btnW / 2;
   const btnY = h - 90;
   return new DOMRect(btnX, btnY, btnW, btnH);
+}
+
+export function getLinkHitArea(w: number, h: number, reviveAvailable: boolean): DOMRect {
+  const cx = w / 2;
+  const linkBtnW = 240;
+  const linkBtnH = 36;
+  const linkBtnX = cx - linkBtnW / 2;
+  const linkBtnY = reviveAvailable ? h - 145 : h - 90;
+  return new DOMRect(linkBtnX, linkBtnY, linkBtnW, linkBtnH);
 }
 
 export function getTabHitArea(w: number, h: number): { allTab: DOMRect; weeklyTab: DOMRect } {

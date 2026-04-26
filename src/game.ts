@@ -1,9 +1,9 @@
 import { GameState, CarrotType, BunnyPose, type Carrot, type Particle, type Cloud, type ScorePopup, type RankEntry } from './types';
 import { AudioManager } from './audio';
-import { initAuth, getLocalUUID } from './services/auth';
+import { initAuth, getLocalUUID, isAccountLinked, linkGoogleAccount } from './services/auth';
 import { submitScore } from './services/score';
 import { fetchRanking, invalidateCache } from './services/leaderboard';
-import { renderRankingScreen, getTabHitArea, getReviveHitArea } from './ui/ranking-screen';
+import { renderRankingScreen, getTabHitArea, getReviveHitArea, getLinkHitArea } from './ui/ranking-screen';
 import { showProfileModal } from './ui/profile-modal';
 import { initAds, showBanner, hideBanner, showInterstitialOnGameOver, isRewardedReady, showRewardedAd, areAdsRemoved } from './services/ad-service';
 import { initIAP } from './services/iap-service';
@@ -126,6 +126,7 @@ export class Game {
         if (this.handleShopButtonTap(x, y)) return;
         if (this.handleTabTap(x, y)) return;
         if (this.handleReviveTap(x, y)) return;
+        if (this.handleLinkTap(x, y)) return;
         this.resetGame();
         this.state = GameState.START;
       },
@@ -688,6 +689,17 @@ export class Game {
       this.hasJumped = true;
       this.audio.startBGM();
     }
+  }
+
+  private handleLinkTap(x: number, y: number): boolean {
+    if (isAccountLinked()) return false;
+    const btn = getLinkHitArea(this.w, this.h, this.reviveAvailable);
+    if (x >= btn.x && x <= btn.x + btn.width &&
+        y >= btn.y && y <= btn.y + btn.height) {
+      linkGoogleAccount();
+      return true;
+    }
+    return false;
   }
 
   private handleShopButtonTap(x: number, y: number): boolean {
