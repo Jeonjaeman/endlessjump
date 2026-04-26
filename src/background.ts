@@ -44,10 +44,11 @@ function getZoneIndex(height: number): number {
 }
 
 // ── 패럴랙스 설정 ──────────────────────────────────────────
-const PARALLAX_SCALE = 1.15;        // 배경을 15% 크게 그려서 여유 확보
+const PARALLAX_SCALE = 1.18;        // 배경을 18% 크게 그려서 여유 확보
 const PARALLAX_X_FACTOR = 0.06;     // 토끼 X 이동 → 배경 반대 이동 비율
-const PARALLAX_Y_FACTOR = 0.025;    // 수직 속도 → 배경 이동 비율
-const PARALLAX_SMOOTH = 0.12;       // 부드러운 보간 속도
+const PARALLAX_Y_FACTOR = 3.0;      // 수직 속도 → 배경 Y 이동 (위로 점프 시 배경 아래로)
+const PARALLAX_SMOOTH = 0.10;       // 부드러운 보간 속도
+const PARALLAX_Y_MAX = 30;          // Y 오프셋 최대값 (px)
 
 export class BackgroundRenderer {
   private currentKey: AssetKey | null = null;
@@ -74,7 +75,9 @@ export class BackgroundRenderer {
       this.targetOffsetX = -(bunnyX - centerX) * PARALLAX_X_FACTOR;
     }
     if (velY != null) {
-      this.targetOffsetY = velY * PARALLAX_Y_FACTOR;
+      // 점프(velY<0) → 배경 아래로, 하강(velY>0) → 배경 위로
+      const rawY = velY * PARALLAX_Y_FACTOR;
+      this.targetOffsetY = Math.max(-PARALLAX_Y_MAX, Math.min(PARALLAX_Y_MAX, rawY));
     }
 
     // 부드러운 보간
