@@ -50,6 +50,65 @@ function clamp(v: number, min: number, max: number): number {
   return v < min ? min : v > max ? max : v;
 }
 
+const particleCache = new Map<string, HTMLCanvasElement>();
+
+function getParticleSprite(color: string, radius: number): HTMLCanvasElement {
+  const key = `${color}_${radius}`;
+  let canvas = particleCache.get(key);
+  if (canvas) return canvas;
+
+  canvas = document.createElement('canvas');
+  const size = Math.ceil(radius * 3);
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  const cx = size / 2;
+  const grad = ctx.createRadialGradient(cx, cx, 0, cx, cx, radius);
+  grad.addColorStop(0, color);
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cx, radius * 1.5, 0, Math.PI * 2);
+  ctx.fill();
+  particleCache.set(key, canvas);
+  return canvas;
+}
+
+const cloudSpriteCache = new Map<string, HTMLCanvasElement>();
+
+function getCloudSprite(width: number, height: number): HTMLCanvasElement {
+  const key = `${width}_${height}`;
+  let canvas = cloudSpriteCache.get(key);
+  if (canvas) return canvas;
+
+  canvas = document.createElement('canvas');
+  canvas.width = Math.ceil(width);
+  canvas.height = Math.ceil(height);
+  const ctx = canvas.getContext('2d')!;
+  const cx = width / 2;
+  const cy = height / 2;
+
+  const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, width / 2);
+  grd.addColorStop(0, 'rgba(255,255,255,0.9)');
+  grd.addColorStop(0.6, 'rgba(255,255,255,0.4)');
+  grd.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = grd;
+
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, width / 2, height / 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(cx - width * 0.22, cy + height * 0.15, width * 0.3, height * 0.35, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + width * 0.22, cy + height * 0.15, width * 0.3, height * 0.35, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  cloudSpriteCache.set(key, canvas);
+  return canvas;
+}
+
 export class Game {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
@@ -927,33 +986,11 @@ export class Game {
         continue;
       }
 
-      // Vector fallback (기존 코드)
+      // Cached vector fallback
       ctx.save();
       ctx.globalAlpha = cl.opacity * (0.5 + cl.z * 0.5);
-
-      const grd = ctx.createRadialGradient(cl.x, screenY, 0, cl.x, screenY, cw / 2);
-      grd.addColorStop(0, 'rgba(255,255,255,0.9)');
-      grd.addColorStop(0.6, 'rgba(255,255,255,0.4)');
-      grd.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.fillStyle = grd;
-
-      ctx.beginPath();
-      ctx.ellipse(cl.x, screenY, cw / 2, ch / 2, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.ellipse(cl.x - cw * 0.22, screenY + ch * 0.15, cw * 0.3, ch * 0.35, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.ellipse(cl.x + cw * 0.22, screenY + ch * 0.15, cw * 0.3, ch * 0.35, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.globalAlpha = cl.opacity * 0.15 * cl.z;
-      ctx.fillStyle = '#8899aa';
-      ctx.beginPath();
-      ctx.ellipse(cl.x, screenY + ch * 0.4, cw * 0.4, ch * 0.2, 0, 0, Math.PI * 2);
-      ctx.fill();
-
+      const cachedCloud = getCloudSprite(cw, ch);
+      ctx.drawImage(cachedCloud, cl.x - cw / 2, screenY - ch / 2);
       ctx.restore();
     }
   }
@@ -1458,14 +1495,9 @@ export class Game {
       const sy = this.worldToScreen(p.y);
       const alpha = p.life / p.maxLife;
       ctx.globalAlpha = alpha;
-
-      const grad = ctx.createRadialGradient(p.x, sy, 0, p.x, sy, p.radius);
-      grad.addColorStop(0, p.color);
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(p.x, sy, p.radius * 1.5, 0, Math.PI * 2);
-      ctx.fill();
+      const sprite = getParticleSprite(p.color, p.radius);
+      const size = sprite.width;
+      ctx.drawImage(sprite, p.x - size / 2, sy - size / 2);
     }
     ctx.globalAlpha = 1;
   }
