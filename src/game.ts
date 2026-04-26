@@ -11,6 +11,7 @@ import { initSkins, getCurrentSkinColors } from './services/skin-service';
 import { initAchievements, onGameOver as achOnGameOver, onCarrotEaten as achOnCarrotEaten, popRecentlyCompleted } from './services/achievement-service';
 import { isShopOpen, openShop, closeShop, handleShopTap, renderShop, renderShopButton, getShopButtonArea, renderAchievementPopup, queueAchievementPopup, clearAchievementPopups } from './ui/shop-screen';
 import { assetManager } from './assets';
+import { BackgroundRenderer } from './background';
 
 const GRAVITY = 0.6;
 const JUMP_VELOCITY = -15;
@@ -18,7 +19,6 @@ const MAX_FALL_SPEED = 12;
 const BUNNY_RADIUS = 18;
 const CARROT_RADIUS = 14;
 const CARROT_HIT_RADIUS = 22;
-const DAY_CYCLE_MS = 120_000;
 const CAMERA_LERP = 0.08;
 const CARROT_FALL_SPEED = 0.4;
 const MAX_CARROT_BELOW = 2000;
@@ -148,6 +148,7 @@ export class Game {
   private scoreColor = '#FFF';
 
   private audio = new AudioManager();
+  private bg = new BackgroundRenderer();
 
   // Ranking state
   private rankings: RankEntry[] = [];
@@ -733,19 +734,11 @@ export class Game {
     ctx.restore();
   }
 
-  private skyGradientCache: CanvasGradient | null = null;
-  private skyGradientH = 0;
-
   private renderBackground(ctx: CanvasRenderingContext2D): void {
-    if (!this.skyGradientCache || this.skyGradientH !== this.h) {
-      this.skyGradientH = this.h;
-      const grad = ctx.createLinearGradient(0, 0, 0, this.h);
-      grad.addColorStop(0, '#1a1a3e');
-      grad.addColorStop(1, '#2d4a7a');
-      this.skyGradientCache = grad;
-    }
-    ctx.fillStyle = this.skyGradientCache;
-    ctx.fillRect(0, 0, this.w, this.h);
+    const elapsed = this.state === GameState.PLAYING
+      ? (performance.now() - this.startTime)
+      : 0;
+    this.bg.render(ctx, this.w, this.h, this.heightReached, elapsed, this.state === GameState.PLAYING);
   }
 
   private renderClouds3D(ctx: CanvasRenderingContext2D): void {
