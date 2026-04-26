@@ -9,7 +9,8 @@ import { initAds, showBanner, hideBanner, showInterstitialOnGameOver, isRewarded
 import { initIAP } from './services/iap-service';
 import { initSkins, getCurrentSkinColors } from './services/skin-service';
 import { initAchievements, onGameOver as achOnGameOver, onCarrotEaten as achOnCarrotEaten, popRecentlyCompleted } from './services/achievement-service';
-import { isShopOpen, openShop, closeShop, handleShopTap, renderShop, renderShopButton, getShopButtonArea, renderAchievementPopup, queueAchievementPopup, clearAchievementPopups } from './ui/shop-screen';
+import { isShopOpen, openShop, renderShop, renderShopButton, getShopButtonArea, renderAchievementPopup, queueAchievementPopup, clearAchievementPopups } from './ui/shop-screen';
+import { InputManager } from './input';
 import { assetManager } from './assets';
 import { BackgroundRenderer } from './background';
 
@@ -165,7 +166,37 @@ export class Game {
     if (!ctx) throw new Error('Canvas 2D context not supported');
     this.ctx = ctx;
     this.loadBest();
-    this.setupEvents();
+    const self = this;
+    new InputManager(canvas, {
+      get state() { return self.state; },
+      get w() { return self.w; },
+      initAudio: () => this.audio.initAudio(),
+      onStartGame: () => {
+        this.state = GameState.PLAYING;
+        this.velY = JUMP_VELOCITY;
+        this.hasJumped = true;
+        this.touching = true;
+        this.startTime = performance.now();
+        this.audio.startBGM();
+        if (!areAdsRemoved()) showBanner();
+      },
+      onGameOverTap: (x: number, y: number) => {
+        if (this.handleShopButtonTap(x, y)) return;
+        if (this.handleTabTap(x, y)) return;
+        if (this.handleReviveTap(x, y)) return;
+        this.resetGame();
+        this.state = GameState.START;
+      },
+      onTouchStart: (x: number) => {
+        this.touchX = x;
+        this.touching = true;
+      },
+      onTouchMove: (x: number) => {
+        if (!this.touching) return;
+        this.touchX = x;
+      },
+      onTouchEnd: () => { this.touching = false; },
+    });
     getLocalUUID();
     initAuth();
     initSkins();
@@ -336,88 +367,6 @@ export class Game {
       });
       prevX = x;
     }
-  }
-
-  private setupEvents(): void {
-    const c = this.canvas;
-
-    c.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      this.audio.initAudio();
-      const t = e.touches[0];
-      this.touchX = t.clientX;
-      // 상점 열려 있으면 상점 터치 처리
-      if (isShopOpen()) {
-        handleShopTap(t.clientX, t.clientY);
-        return;
-      }
-      if (this.state === GameState.START) {
-        this.state = GameState.PLAYING;
-        this.velY = JUMP_VELOCITY;
-        this.hasJumped = true;
-        this.touching = true;
-        this.startTime = performance.now();
-        this.audio.startBGM();
-        if (!areAdsRemoved()) showBanner();
-        return;
-      }
-      if (this.state === GameState.GAME_OVER) {
-        if (this.handleShopButtonTap(t.clientX, t.clientY)) return;
-        if (this.handleTabTap(t.clientX, t.clientY)) return;
-        if (this.handleReviveTap(t.clientX, t.clientY)) return;
-        this.resetGame();
-        this.state = GameState.START;
-        return;
-      }
-      this.touching = true;
-    });
-
-    c.addEventListener('touchmove', (e) => {
-      e.preventDefault();
-      if (!this.touching || this.state !== GameState.PLAYING) return;
-      this.touchX = e.touches[0].clientX;
-    });
-
-    c.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      this.touching = false;
-    });
-
-    c.addEventListener('mousedown', (e) => {
-      this.audio.initAudio();
-      this.touchX = e.clientX;
-      // 상점 열려 있으면 상점 터치 처리
-      if (isShopOpen()) {
-        handleShopTap(e.clientX, e.clientY);
-        return;
-      }
-      if (this.state === GameState.START) {
-        this.state = GameState.PLAYING;
-        this.velY = JUMP_VELOCITY;
-        this.hasJumped = true;
-        this.touching = true;
-        this.startTime = performance.now();
-        this.audio.startBGM();
-        if (!areAdsRemoved()) showBanner();
-        return;
-      }
-      if (this.state === GameState.GAME_OVER) {
-        if (this.handleShopButtonTap(e.clientX, e.clientY)) return;
-        if (this.handleTabTap(e.clientX, e.clientY)) return;
-        if (this.handleReviveTap(e.clientX, e.clientY)) return;
-        this.resetGame();
-        this.state = GameState.START;
-        return;
-      }
-      this.touching = true;
-    });
-
-    c.addEventListener('mousemove', (e) => {
-      if (!this.touching || this.state !== GameState.PLAYING) return;
-      this.touchX = e.clientX;
-    });
-
-    c.addEventListener('mouseup', () => { this.touching = false; });
   }
 
   private update(): void {
