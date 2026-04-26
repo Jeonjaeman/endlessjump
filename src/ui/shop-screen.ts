@@ -166,13 +166,22 @@ export function renderShop(ctx: CanvasRenderingContext2D, w: number, h: number):
   const panelX = (w - panelW) / 2;
   const panelY = (h - panelH) / 2;
 
-  // 패널 배경
-  ctx.fillStyle = 'rgba(30,30,50,0.95)';
+  // 패널 배경 (글라스모피즘)
+  ctx.fillStyle = 'rgba(20,20,40,0.85)';
   ctx.beginPath();
   roundRect(ctx, panelX, panelY, panelW, panelH, 16);
   ctx.fill();
 
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  // 상단 하이라이트
+  const panelHL = ctx.createLinearGradient(panelX, panelY, panelX, panelY + panelH * 0.3);
+  panelHL.addColorStop(0, 'rgba(255,255,255,0.1)');
+  panelHL.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = panelHL;
+  ctx.beginPath();
+  roundRect(ctx, panelX, panelY, panelW, panelH * 0.3, 16);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
   ctx.lineWidth = 1;
   ctx.beginPath();
   roundRect(ctx, panelX, panelY, panelW, panelH, 16);
@@ -219,12 +228,31 @@ export function renderShop(ctx: CanvasRenderingContext2D, w: number, h: number):
     const tx = panelX + 10 + i * (tabW + 5);
     const active = shopTab === tab.key;
 
-    ctx.fillStyle = active ? 'rgba(255,107,53,0.8)' : 'rgba(255,255,255,0.1)';
+    // 글라스모피즘 탭
+    const bg = active ? 'rgba(255,107,53,0.5)' : 'rgba(255,255,255,0.06)';
+    const border = active ? 'rgba(255,180,130,0.5)' : 'rgba(255,255,255,0.12)';
+    ctx.fillStyle = bg;
     ctx.beginPath();
-    roundRect(ctx, tx, tabY, tabW, tabH, 6);
+    roundRect(ctx, tx, tabY, tabW, tabH, 8);
     ctx.fill();
 
-    ctx.fillStyle = active ? '#FFF' : 'rgba(255,255,255,0.5)';
+    if (active) {
+      const hlG = ctx.createLinearGradient(tx, tabY, tx, tabY + tabH * 0.5);
+      hlG.addColorStop(0, 'rgba(255,255,255,0.2)');
+      hlG.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = hlG;
+      ctx.beginPath();
+      roundRect(ctx, tx, tabY, tabW, tabH * 0.5, 8);
+      ctx.fill();
+    }
+
+    ctx.strokeStyle = border;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    roundRect(ctx, tx, tabY, tabW, tabH, 8);
+    ctx.stroke();
+
+    ctx.fillStyle = active ? '#FFF' : 'rgba(255,255,255,0.6)';
     ctx.font = active ? 'bold 13px sans-serif' : '13px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(tab.label, tx + tabW / 2, tabY + tabH / 2 + 5);
@@ -341,19 +369,28 @@ function renderSkinsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
     const unlockInfo = getSkinUnlockInfo(skin.id);
     const spriteSet = skin.spriteDir ? skinAssetLoader.getSprites(skin.id) : null;
 
-    // 행 배경
-    ctx.fillStyle = isSelected ? 'rgba(255,107,53,0.2)' : 'rgba(255,255,255,0.06)';
+    // 행 배경 (글라스모피즘)
+    const rowBg = isSelected ? 'rgba(255,107,53,0.18)' : 'rgba(255,255,255,0.05)';
+    const rowBorder = isSelected ? 'rgba(255,160,100,0.5)' : 'rgba(255,255,255,0.08)';
+    ctx.fillStyle = rowBg;
     ctx.beginPath();
     roundRect(ctx, x, ry, w, rowH, 10);
     ctx.fill();
 
-    if (isSelected) {
-      ctx.strokeStyle = '#FF6B35';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      roundRect(ctx, x, ry, w, rowH, 10);
-      ctx.stroke();
-    }
+    // 상단 하이라이트
+    const rowHL = ctx.createLinearGradient(x, ry, x, ry + rowH * 0.4);
+    rowHL.addColorStop(0, 'rgba(255,255,255,0.06)');
+    rowHL.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = rowHL;
+    ctx.beginPath();
+    roundRect(ctx, x, ry, w, rowH * 0.4, 10);
+    ctx.fill();
+
+    ctx.strokeStyle = rowBorder;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    roundRect(ctx, x, ry, w, rowH, 10);
+    ctx.stroke();
 
     // 스킨 프리뷰 (48x48)
     const previewSize = 48;
@@ -410,23 +447,9 @@ function renderSkinsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
 
       const btnY = ry + (rowH - btnH) / 2;
       if (isSelected) {
-        ctx.fillStyle = 'rgba(255,107,53,0.6)';
-        ctx.beginPath();
-        roundRect(ctx, btnX, btnY, btnW, btnH, 6);
-        ctx.fill();
-        ctx.fillStyle = '#FFF';
-        ctx.font = 'bold 11px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('선택됨', btnX + btnW / 2, btnY + btnH / 2 + 4);
+        drawGlassBtn(ctx, btnX, btnY, btnW, btnH, '선택됨', 'rgba(255,107,53,0.5)', 'rgba(255,180,130,0.5)');
       } else {
-        ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        ctx.beginPath();
-        roundRect(ctx, btnX, btnY, btnW, btnH, 6);
-        ctx.fill();
-        ctx.fillStyle = '#FFF';
-        ctx.font = '11px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('선택', btnX + btnW / 2, btnY + btnH / 2 + 4);
+        drawGlassBtn(ctx, btnX, btnY, btnW, btnH, '선택', 'rgba(255,255,255,0.08)', 'rgba(255,255,255,0.15)');
         itemButtonAreas.push({ id: skin.id, area: { x: btnX, y: btnY, width: btnW, height: btnH } });
       }
 
@@ -438,15 +461,8 @@ function renderSkinsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
       ctx.fillText('PREMIUM', textX, ry + 36);
 
       const btnY = ry + (rowH - btnH) / 2;
-      ctx.fillStyle = '#FF6B35';
-      ctx.beginPath();
-      roundRect(ctx, btnX, btnY, btnW, btnH, 6);
-      ctx.fill();
-      ctx.fillStyle = '#FFF';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.textAlign = 'center';
       const priceText = skin.price >= 1000 ? `₩${(skin.price / 1000).toFixed(1)}K` : `₩${skin.price.toLocaleString()}`;
-      ctx.fillText(priceText, btnX + btnW / 2, btnY + btnH / 2 + 4);
+      drawGlassBtn(ctx, btnX, btnY, btnW, btnH, priceText, 'rgba(255,107,53,0.45)', 'rgba(255,160,100,0.5)');
       itemButtonAreas.push({ id: skin.id, area: { x: btnX, y: btnY, width: btnW, height: btnH } });
 
     } else if (unlockInfo.unlockScore != null) {
@@ -474,15 +490,8 @@ function renderSkinsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
 
       // or ₩X 버튼
       const btnY = ry + (rowH - btnH) / 2;
-      ctx.fillStyle = 'rgba(255,200,50,0.7)';
-      ctx.beginPath();
-      roundRect(ctx, btnX, btnY, btnW, btnH, 6);
-      ctx.fill();
-      ctx.fillStyle = '#FFF';
-      ctx.font = 'bold 10px sans-serif';
-      ctx.textAlign = 'center';
       const orPrice = skin.price >= 1000 ? `₩${(skin.price / 1000).toFixed(1)}K` : `₩${skin.price.toLocaleString()}`;
-      ctx.fillText(`or ${orPrice}`, btnX + btnW / 2, btnY + btnH / 2 + 4);
+      drawGlassBtn(ctx, btnX, btnY, btnW, btnH, `or ${orPrice}`, 'rgba(255,200,50,0.35)', 'rgba(255,220,100,0.5)', '10px');
       itemButtonAreas.push({ id: skin.id, area: { x: btnX, y: btnY, width: btnW, height: btnH } });
 
     } else {
@@ -493,15 +502,8 @@ function renderSkinsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
       ctx.fillText(skin.description, textX, ry + 36);
 
       const btnY = ry + (rowH - btnH) / 2;
-      ctx.fillStyle = '#FF6B35';
-      ctx.beginPath();
-      roundRect(ctx, btnX, btnY, btnW, btnH, 6);
-      ctx.fill();
-      ctx.fillStyle = '#FFF';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.textAlign = 'center';
       const priceText = skin.price >= 1000 ? `₩${(skin.price / 1000).toFixed(1)}K` : `₩${skin.price.toLocaleString()}`;
-      ctx.fillText(priceText, btnX + btnW / 2, btnY + btnH / 2 + 4);
+      drawGlassBtn(ctx, btnX, btnY, btnW, btnH, priceText, 'rgba(255,107,53,0.45)', 'rgba(255,160,100,0.5)');
       itemButtonAreas.push({ id: skin.id, area: { x: btnX, y: btnY, width: btnW, height: btnH } });
     }
   });
@@ -672,6 +674,37 @@ export function renderAchievementPopup(ctx: CanvasRenderingContext2D, w: number,
   ctx.fillText(`${currentPopup.name} — 🪙${currentPopup.reward}`, popX + 42, popY + 38);
 
   ctx.restore();
+}
+
+// ── 유틸: 글라스모피즘 버튼 ──────────────────────────────────
+function drawGlassBtn(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number,
+  label: string, bg: string, border: string, fontSize: string = '11px',
+): void {
+  ctx.fillStyle = bg;
+  ctx.beginPath();
+  roundRect(ctx, x, y, w, h, 8);
+  ctx.fill();
+
+  const hlG = ctx.createLinearGradient(x, y, x, y + h * 0.5);
+  hlG.addColorStop(0, 'rgba(255,255,255,0.18)');
+  hlG.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = hlG;
+  ctx.beginPath();
+  roundRect(ctx, x, y, w, h * 0.5, 8);
+  ctx.fill();
+
+  ctx.strokeStyle = border;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  roundRect(ctx, x, y, w, h, 8);
+  ctx.stroke();
+
+  ctx.fillStyle = '#FFF';
+  ctx.font = `bold ${fontSize} sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText(label, x + w / 2, y + h / 2 + 4);
 }
 
 // ── 유틸: roundRect ─────────────────────────────────────────
