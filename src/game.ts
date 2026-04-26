@@ -7,7 +7,7 @@ import { renderRankingScreen, getTabHitArea, getReviveHitArea, getLinkHitArea } 
 import { showProfileModal } from './ui/profile-modal';
 import { initAds, showBanner, hideBanner, showInterstitialOnGameOver, isRewardedReady, showRewardedAd, areAdsRemoved } from './services/ad-service';
 import { initIAP } from './services/iap-service';
-import { initSkins, getCurrentSkinColors } from './services/skin-service';
+import { initSkins, getCurrentSkinColors, getSelectedSkinId } from './services/skin-service';
 import { skinAssetLoader } from './skin-assets';
 import { initAchievements, onGameOver as achOnGameOver, onCarrotEaten as achOnCarrotEaten, popRecentlyCompleted } from './services/achievement-service';
 import { isShopOpen, openShop, renderShop, renderShopButton, getShopButtonArea, renderAchievementPopup, queueAchievementPopup, clearAchievementPopups } from './ui/shop-screen';
@@ -119,6 +119,7 @@ export class Game {
         this.hasJumped = true;
         this.touching = true;
         this.startTime = performance.now();
+        this.audio.setBGM(getSelectedSkinId());
         this.audio.startBGM();
         if (!areAdsRemoved()) showBanner();
       },

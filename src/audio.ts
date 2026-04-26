@@ -9,18 +9,25 @@ const SFX_PATHS: Record<string, string> = {
   skin_equip: '/assets/audio/sfx/skin_equip.ogg',
 };
 
+// ── BGM 파일 경로 (스킨별) ───────────────────────────────────
+const BGM_BASE = '/assets/audio/bgm/';
+const DEFAULT_BGM = 'default';
+
 export class AudioManager {
   private audioCtx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private bgmGain: GainNode | null = null;
   private sfxGain: GainNode | null = null;
   private bgmStarted = false;
-  private bgmTimeout: ReturnType<typeof setTimeout> | null = null;
-  private bgmIteration = 0;
 
-  // SFX 버퍼 캐시
+  // SFX
   private sfxBuffers = new Map<string, AudioBuffer>();
   private sfxLoaded = false;
+
+  // BGM (파일 기반)
+  private bgmElement: HTMLAudioElement | null = null;
+  private bgmMediaSource: MediaElementAudioSourceNode | null = null;
+  private currentBgmId: string = DEFAULT_BGM;
 
   initAudio(): void {
     if (this.audioCtx) {
@@ -36,18 +43,19 @@ export class AudioManager {
     this.masterGain.connect(this.audioCtx.destination);
 
     this.bgmGain = this.audioCtx.createGain();
-    this.bgmGain.gain.value = 0.10;
+    this.bgmGain.gain.value = 0.25;
     this.bgmGain.connect(this.masterGain);
 
     this.sfxGain = this.audioCtx.createGain();
     this.sfxGain.gain.value = 0.7;
     this.sfxGain.connect(this.masterGain);
 
-    // SFX 파일 프리로드
     if (!this.sfxLoaded) {
       this.loadAllSFX();
     }
   }
+
+  // ── SFX 로딩/재생 ────────────────────────────────────────────
 
   private async loadAllSFX(): Promise<void> {
     if (!this.audioCtx) return;
@@ -59,9 +67,7 @@ export class AudioManager {
         const arrayBuf = await res.arrayBuffer();
         const audioBuf = await ctx.decodeAudioData(arrayBuf);
         this.sfxBuffers.set(key, audioBuf);
-      } catch {
-        // SFX 로드 실패 — 절차적 폴백 사용
-      }
+      } catch { /* SFX 로드 실패 — 무시 */ }
     });
     await Promise.all(tasks);
     this.sfxLoaded = true;
@@ -77,173 +83,66 @@ export class AudioManager {
     src.start();
   }
 
-  // ── BGM ──────────────────────────────────────────────────────
+  // ── BGM (파일 기반, 루프) ─────────────────────────────────────
+
+  setBGM(skinId: string): void {
+    this.currentBgmId = skinId || DEFAULT_BGM;
+  }
 
   startBGM(): void {
     if (!this.audioCtx || !this.bgmGain) return;
-    this.bgmStarted = false;
-    this.bgmIteration = 0;
-    if (this.bgmTimeout) clearTimeout(this.bgmTimeout);
-    this.bgmTimeout = setTimeout(() => {
-      this.bgmStarted = true;
-      this.scheduleBGMLoop();
-    }, 50);
+
+    // 이전 BGM 정리
+    this.stopBGMPlayback();
+
+    const audio = new Audio(`${BGM_BASE}${this.currentBgmId}.mp3`);
+    audio.loop = true;
+    audio.preload = 'auto';
+
+    // MediaElementSource → bgmGain → masterGain → destination
+    const source = this.audioCtx.createMediaElementSource(audio);
+    source.connect(this.bgmGain);
+
+    this.bgmElement = audio;
+    this.bgmMediaSource = source;
+    this.bgmStarted = true;
+
+    // 재생 (에러 시 무시 — 파일 없으면 BGM 없이 진행)
+    audio.play().catch(() => {});
   }
 
-  private scheduleBGMLoop(): void {
-    if (!this.audioCtx || !this.bgmGain) return;
-    const ctx = this.audioCtx;
-    const gain = this.bgmGain;
-    const bpm = 140;
-    const beatDur = 60 / bpm;
-
-    const melodyA: [number, number][] = [
-      [523, 1], [587, 0.5], [659, 0.5], [784, 1], [659, 1],
-      [587, 1], [523, 0.5], [440, 0.5], [523, 1], [587, 1],
-      [659, 1], [784, 0.5], [880, 0.5], [784, 1], [659, 1],
-      [523, 1], [587, 0.5], [523, 0.5], [440, 1], [523, 1],
-    ];
-
-    const melodyB: [number, number][] = [
-      [659, 1], [784, 0.5], [880, 0.5], [784, 1], [659, 1],
-      [523, 1], [587, 0.5], [659, 0.5], [784, 1], [880, 1],
-      [784, 1], [659, 0.5], [587, 0.5], [523, 1], [440, 1],
-      [523, 1], [440, 0.5], [523, 0.5], [587, 1], [523, 1],
-    ];
-
-    const melody = this.bgmIteration % 2 === 0 ? melodyA : melodyB;
-
-    const bassNotes: [number, number][] = [
-      [131, 1], [196, 0.5], [196, 0.5], [165, 1], [247, 0.5], [247, 0.5],
-      [175, 1], [262, 0.5], [262, 0.5], [131, 1], [196, 0.5], [196, 0.5],
-      [131, 1], [196, 0.5], [196, 0.5], [165, 1], [247, 0.5], [247, 0.5],
-      [175, 1], [262, 0.5], [262, 0.5], [131, 1], [196, 0.5], [196, 0.5],
-    ];
-
-    const startTime = ctx.currentTime + 0.05;
-
-    // 멜로디
-    let t = startTime;
-    for (const [freq, beats] of melody) {
-      const dur = beats * beatDur;
-      const osc = ctx.createOscillator();
-      const env = ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.value = freq;
-      env.gain.setValueAtTime(0, t);
-      env.gain.linearRampToValueAtTime(0.28, t + 0.02);
-      env.gain.exponentialRampToValueAtTime(0.001, t + dur * 0.95);
-      osc.connect(env);
-      env.connect(gain);
-      osc.start(t);
-      osc.stop(t + dur);
-      t += dur;
+  private stopBGMPlayback(): void {
+    if (this.bgmElement) {
+      this.bgmElement.pause();
+      this.bgmElement.src = '';
+      this.bgmElement = null;
     }
-    const loopDuration = t - startTime;
-
-    // 베이스
-    let tb = startTime;
-    for (const [freq, beats] of bassNotes) {
-      const dur = beats * beatDur;
-      const osc = ctx.createOscillator();
-      const env = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      env.gain.setValueAtTime(0, tb);
-      env.gain.linearRampToValueAtTime(0.14, tb + 0.01);
-      env.gain.exponentialRampToValueAtTime(0.001, tb + dur * 0.9);
-      osc.connect(env);
-      env.connect(gain);
-      osc.start(tb);
-      osc.stop(tb + dur);
-      tb += dur;
+    if (this.bgmMediaSource) {
+      this.bgmMediaSource.disconnect();
+      this.bgmMediaSource = null;
     }
-
-    // 하이햇 리듬
-    const hihatInterval = beatDur;
-    const hihatCount = Math.floor(loopDuration / hihatInterval);
-    for (let i = 0; i < hihatCount; i++) {
-      const ht = startTime + i * hihatInterval;
-      const accent = i % 3 === 0;
-      this.playHihat(ctx, gain, ht, accent ? 0.06 : 0.03);
-    }
-
-    // 코드 패드
-    const chords: [number[], number][] = [
-      [[262, 330, 392], 4],
-      [[220, 330, 440], 4],
-      [[175, 262, 349], 4],
-      [[196, 247, 392], 4],
-    ];
-    let tc = startTime;
-    for (const [freqs, beats] of chords) {
-      const dur = beats * beatDur;
-      for (const freq of freqs) {
-        const osc = ctx.createOscillator();
-        const env = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = freq;
-        env.gain.setValueAtTime(0, tc);
-        env.gain.linearRampToValueAtTime(0.04, tc + 0.1);
-        env.gain.setValueAtTime(0.04, tc + dur * 0.7);
-        env.gain.exponentialRampToValueAtTime(0.001, tc + dur);
-        osc.connect(env);
-        env.connect(gain);
-        osc.start(tc);
-        osc.stop(tc + dur);
-      }
-      tc += dur;
-    }
-
-    this.bgmIteration++;
-    const scheduleAhead = loopDuration * 1000 - 200;
-    setTimeout(() => {
-      if (this.bgmStarted) this.scheduleBGMLoop();
-    }, Math.max(scheduleAhead, 100));
-  }
-
-  private playHihat(ctx: AudioContext, dest: AudioNode, time: number, vol: number): void {
-    const bufLen = Math.floor(ctx.sampleRate * 0.03);
-    const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < bufLen; i++) {
-      data[i] = (Math.random() * 2 - 1);
-    }
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'highpass';
-    filter.frequency.value = 7000;
-    const env = ctx.createGain();
-    env.gain.setValueAtTime(vol, time);
-    env.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
-    src.connect(filter);
-    filter.connect(env);
-    env.connect(dest);
-    src.start(time);
-    src.stop(time + 0.03);
   }
 
   stopBGM(): void {
     this.bgmStarted = false;
-    if (this.bgmTimeout) {
-      clearTimeout(this.bgmTimeout);
-      this.bgmTimeout = null;
-    }
-    if (this.audioCtx && this.audioCtx.state === 'running') {
-      this.audioCtx.suspend();
-    }
+    this.stopBGMPlayback();
   }
 
   suspend(): void {
+    if (this.bgmElement) {
+      this.bgmElement.pause();
+    }
     if (this.audioCtx && this.audioCtx.state === 'running') {
       this.audioCtx.suspend();
     }
   }
 
   resume(): void {
-    if (this.audioCtx && this.audioCtx.state === 'suspended' && this.bgmStarted) {
+    if (this.audioCtx && this.audioCtx.state === 'suspended') {
       this.audioCtx.resume();
+    }
+    if (this.bgmStarted && this.bgmElement) {
+      this.bgmElement.play().catch(() => {});
     }
   }
 
