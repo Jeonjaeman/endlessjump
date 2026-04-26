@@ -10,8 +10,6 @@
 import type { BunnySkin, SkinColors } from '../types';
 import {
   isProductPurchased,
-  PRODUCT_SKIN_PACK_PINK,
-  PRODUCT_SKIN_PACK_GOLDEN,
   PRODUCT_SKIN_PACK_SHADOW,
   PRODUCT_SKIN_PACK_SHADOW_NINJA,
   PRODUCT_SKIN_PACK_OCEAN_PIRATE,
@@ -36,25 +34,6 @@ const DEFAULT_COLORS: SkinColors = {
   cheek: 'rgba(255,180,180,0.2)',
 };
 
-const PINK_COLORS: SkinColors = {
-  body: '#FFB6C1',
-  bodyLight: '#FFD1DC',
-  bodyDark: '#E8909C',
-  belly: 'rgba(255,220,230,0.4)',
-  earInner: '#FF69B4',
-  nose: '#FF1493',
-  cheek: 'rgba(255,105,180,0.25)',
-};
-
-const GOLDEN_COLORS: SkinColors = {
-  body: '#FFD700',
-  bodyLight: '#FFE44D',
-  bodyDark: '#CC9900',
-  belly: 'rgba(255,248,200,0.4)',
-  earInner: '#FFA500',
-  nose: '#FF8C00',
-  cheek: 'rgba(255,200,50,0.25)',
-};
 
 const SHADOW_COLORS: SkinColors = {
   body: '#4A4A5A',
@@ -146,24 +125,6 @@ const ALL_SKINS: BunnySkin[] = [
     price: 0,
     productId: '',
     unlocked: true,
-  },
-  {
-    id: 'pink',
-    name: '핑크 버니',
-    description: '사랑스러운 핑크 토끼',
-    colors: PINK_COLORS,
-    price: 1100,
-    productId: PRODUCT_SKIN_PACK_PINK,
-    unlocked: false,
-  },
-  {
-    id: 'golden',
-    name: '골든 버니',
-    description: '반짝이는 황금 토끼',
-    colors: GOLDEN_COLORS,
-    price: 2200,
-    productId: PRODUCT_SKIN_PACK_GOLDEN,
-    unlocked: false,
   },
   {
     id: 'shadow',

@@ -11,15 +11,39 @@ import { getProducts, purchaseProduct, restorePurchases, isProductPurchased, isA
 import { getSkins, selectSkin, getSelectedSkinId, getSkinUnlockInfo, getSkinSpriteDir } from '../services/skin-service';
 import { getAchievements, getCoins } from '../services/achievement-service';
 import { skinAssetLoader } from '../skin-assets';
+import { assetManager } from '../assets';
 import type { BunnySkin, Achievement } from '../types';
 
 // ── 상점 상태 ───────────────────────────────────────────────
 let shopOpen = false;
 let shopTab: 'items' | 'skins' | 'achievements' = 'items';
 let skinsScrollY = 0;
+let shopDragStartY = -1;
+let shopDragScrollStart = 0;
 
 export function isShopOpen(): boolean {
   return shopOpen;
+}
+
+export function handleShopWheel(deltaY: number): void {
+  if (!shopOpen || shopTab !== 'skins') return;
+  skinsScrollY = Math.max(0, Math.min(skinsMaxScroll, skinsScrollY + deltaY));
+}
+
+export function handleShopPointerDown(_x: number, y: number): void {
+  if (!shopOpen || shopTab !== 'skins') return;
+  shopDragStartY = y;
+  shopDragScrollStart = skinsScrollY;
+}
+
+export function handleShopPointerMove(_x: number, y: number): void {
+  if (!shopOpen || shopTab !== 'skins' || shopDragStartY < 0) return;
+  const dy = shopDragStartY - y;
+  skinsScrollY = Math.max(0, Math.min(skinsMaxScroll, shopDragScrollStart + dy));
+}
+
+export function handleShopPointerUp(): void {
+  shopDragStartY = -1;
 }
 
 export function openShop(): void {
@@ -72,19 +96,6 @@ export function handleShopTap(x: number, y: number): boolean {
   if (hitTest(x, y, tabAreas.items)) { shopTab = 'items'; return true; }
   if (hitTest(x, y, tabAreas.skins)) { shopTab = 'skins'; return true; }
   if (hitTest(x, y, tabAreas.achievements)) { shopTab = 'achievements'; return true; }
-
-  // 스킨 탭 스크롤 (드래그 대신 상하 스크롤 버튼 영역)
-  if (shopTab === 'skins' && hitTest(x, y, skinsContentArea)) {
-    // 터치 위치가 콘텐츠 상단 20% → 위로 스크롤, 하단 20% → 아래로 스크롤
-    const relY = (y - skinsContentArea.y) / skinsContentArea.height;
-    if (relY < 0.2) {
-      skinsScrollY = Math.max(0, skinsScrollY - 72);
-      return true;
-    } else if (relY > 0.8) {
-      skinsScrollY = Math.min(skinsMaxScroll, skinsScrollY + 72);
-      return true;
-    }
-  }
 
   // 아이템/스킨 구매 버튼
   for (const btn of itemButtonAreas) {
@@ -342,12 +353,20 @@ function renderSkinsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
     const previewX = x + 8;
     const previewY = ry + (rowH - previewSize) / 2;
 
-    if (spriteSet?.thumb) {
+    // 프리뷰: 스킨 스프라이트 thumb → 기본 bunny_idle 에셋 → 색상 원 폴백
+    const thumbImg = spriteSet?.thumb;
+    const defaultBunnyImg = (!skin.spriteDir && assetManager.has('bunny_idle')) ? assetManager.get('bunny_idle') : null;
+    const previewImg = thumbImg ?? defaultBunnyImg;
+
+    if (previewImg) {
       ctx.save();
       ctx.beginPath();
       roundRect(ctx, previewX, previewY, previewSize, previewSize, 6);
       ctx.clip();
-      ctx.drawImage(spriteSet.thumb, previewX, previewY, previewSize, previewSize);
+      const aspect = previewImg.height / previewImg.width;
+      const drawH = previewSize * aspect;
+      const offsetY = (previewSize - drawH) / 2;
+      ctx.drawImage(previewImg, previewX, previewY + offsetY, previewSize, drawH);
       ctx.restore();
     } else {
       const cx = previewX + previewSize / 2;
