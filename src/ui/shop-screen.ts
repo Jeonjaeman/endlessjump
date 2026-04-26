@@ -8,13 +8,15 @@
  */
 
 import { getProducts, purchaseProduct, restorePurchases, isProductPurchased, isAdsRemoved } from '../services/iap-service';
-import { getSkins, selectSkin, getSelectedSkinId } from '../services/skin-service';
+import { getSkins, selectSkin, getSelectedSkinId, getSkinUnlockInfo, getSkinSpriteDir } from '../services/skin-service';
 import { getAchievements, getCoins } from '../services/achievement-service';
+import { skinAssetLoader } from '../skin-assets';
 import type { BunnySkin, Achievement } from '../types';
 
 // ── 상점 상태 ───────────────────────────────────────────────
 let shopOpen = false;
 let shopTab: 'items' | 'skins' | 'achievements' = 'items';
+let skinsScrollY = 0;
 
 export function isShopOpen(): boolean {
   return shopOpen;
@@ -23,6 +25,7 @@ export function isShopOpen(): boolean {
 export function openShop(): void {
   shopOpen = true;
   shopTab = 'items';
+  skinsScrollY = 0;
 }
 
 export function closeShop(): void {
@@ -40,6 +43,8 @@ let tabAreas: { items: HitRect; skins: HitRect; achievements: HitRect } = {
 };
 let itemButtonAreas: { id: string; area: HitRect }[] = [];
 let restoreArea: HitRect = { x: 0, y: 0, width: 0, height: 0 };
+let skinsContentArea: HitRect = { x: 0, y: 0, width: 0, height: 0 };
+let skinsMaxScroll = 0;
 
 // ── 상점 버튼 히트 영역 (게임 오버 화면에서) ────────────────
 export function getShopButtonArea(w: number, h: number): HitRect {
@@ -67,6 +72,19 @@ export function handleShopTap(x: number, y: number): boolean {
   if (hitTest(x, y, tabAreas.items)) { shopTab = 'items'; return true; }
   if (hitTest(x, y, tabAreas.skins)) { shopTab = 'skins'; return true; }
   if (hitTest(x, y, tabAreas.achievements)) { shopTab = 'achievements'; return true; }
+
+  // 스킨 탭 스크롤 (드래그 대신 상하 스크롤 버튼 영역)
+  if (shopTab === 'skins' && hitTest(x, y, skinsContentArea)) {
+    // 터치 위치가 콘텐츠 상단 20% → 위로 스크롤, 하단 20% → 아래로 스크롤
+    const relY = (y - skinsContentArea.y) / skinsContentArea.height;
+    if (relY < 0.2) {
+      skinsScrollY = Math.max(0, skinsScrollY - 72);
+      return true;
+    } else if (relY > 0.8) {
+      skinsScrollY = Math.min(skinsMaxScroll, skinsScrollY + 72);
+      return true;
+    }
+  }
 
   // 아이템/스킨 구매 버튼
   for (const btn of itemButtonAreas) {
@@ -98,6 +116,11 @@ async function handleItemTap(id: string): Promise<void> {
   if (skin) {
     if (skin.unlocked) {
       selectSkin(skin.id);
+      const spriteDir = getSkinSpriteDir(skin.id);
+      if (spriteDir) {
+        skinAssetLoader.setCurrentSkin(skin.id);
+        skinAssetLoader.loadSkin(skin.id, spriteDir);
+      }
     } else if (skin.productId) {
       await purchaseProduct(skin.productId);
     }
@@ -274,22 +297,34 @@ function renderItemsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
 }
 
 // ── 스킨 탭 ────────────────────────────────────────────────
-function renderSkinsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, screenW: number): void {
+function renderSkinsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, _screenW: number): void {
   const skins = getSkins();
   const selectedId = getSelectedSkinId();
-  const rowH = 64;
+  const rowH = 72;
   const gap = 8;
+  const totalContentH = skins.length * (rowH + gap) - gap;
+
+  // 스크롤 상태 업데이트
+  skinsContentArea = { x, y, width: w, height: h };
+  skinsMaxScroll = Math.max(0, totalContentH - h);
+  skinsScrollY = Math.min(skinsScrollY, skinsMaxScroll);
+
+  // 클리핑
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
 
   skins.forEach((skin, i) => {
-    const ry = y + i * (rowH + gap);
-    if (ry > y + h) return;
+    const ry = y + i * (rowH + gap) - skinsScrollY;
+    if (ry + rowH < y || ry > y + h) return;
 
     const isSelected = skin.id === selectedId;
+    const unlockInfo = getSkinUnlockInfo(skin.id);
+    const spriteSet = skin.spriteDir ? skinAssetLoader.getSprites(skin.id) : null;
 
     // 행 배경
-    ctx.fillStyle = isSelected
-      ? 'rgba(255,107,53,0.2)'
-      : 'rgba(255,255,255,0.06)';
+    ctx.fillStyle = isSelected ? 'rgba(255,107,53,0.2)' : 'rgba(255,255,255,0.06)';
     ctx.beginPath();
     roundRect(ctx, x, ry, w, rowH, 10);
     ctx.fill();
@@ -302,38 +337,52 @@ function renderSkinsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
       ctx.stroke();
     }
 
-    // 스킨 프리뷰 (작은 원)
-    const previewX = x + 30;
-    const previewY = ry + rowH / 2;
-    ctx.fillStyle = skin.colors.body;
-    ctx.beginPath();
-    ctx.arc(previewX, previewY, 16, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = skin.colors.earInner;
-    ctx.beginPath();
-    ctx.arc(previewX - 6, previewY - 14, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(previewX + 6, previewY - 14, 4, 0, Math.PI * 2);
-    ctx.fill();
+    // 스킨 프리뷰 (48x48)
+    const previewSize = 48;
+    const previewX = x + 8;
+    const previewY = ry + (rowH - previewSize) / 2;
 
-    // 이름 + 설명
-    ctx.fillStyle = '#FFF';
-    ctx.font = 'bold 14px sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(skin.name, x + 56, ry + 24);
+    if (spriteSet?.thumb) {
+      ctx.save();
+      ctx.beginPath();
+      roundRect(ctx, previewX, previewY, previewSize, previewSize, 6);
+      ctx.clip();
+      ctx.drawImage(spriteSet.thumb, previewX, previewY, previewSize, previewSize);
+      ctx.restore();
+    } else {
+      const cx = previewX + previewSize / 2;
+      const cy = previewY + previewSize / 2;
+      ctx.fillStyle = skin.colors.body;
+      ctx.beginPath();
+      ctx.arc(cx, cy, previewSize / 2 - 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = skin.colors.earInner;
+      ctx.beginPath();
+      ctx.arc(cx - 7, cy - 16, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(cx + 7, cy - 16, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.font = '11px sans-serif';
-    ctx.fillText(skin.description, x + 56, ry + 42);
-
-    // 상태 버튼
-    const btnW = 64;
+    const textX = x + previewSize + 16;
+    const btnW = 68;
     const btnH = 28;
-    const btnX = x + w - btnW - 10;
-    const btnY = ry + (rowH - btnH) / 2;
+    const btnX = x + w - btnW - 8;
 
-    if (skin.price === 0 || skin.unlocked) {
+    // 이름
+    ctx.fillStyle = '#FFF';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(skin.name, textX, ry + 20);
+
+    if (skin.unlocked) {
+      // 해금됨
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '10px sans-serif';
+      ctx.fillText(skin.description, textX, ry + 36);
+
+      const btnY = ry + (rowH - btnH) / 2;
       if (isSelected) {
         ctx.fillStyle = 'rgba(255,107,53,0.6)';
         ctx.beginPath();
@@ -352,14 +401,17 @@ function renderSkinsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
         ctx.font = '11px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('선택', btnX + btnW / 2, btnY + btnH / 2 + 4);
-
-        itemButtonAreas.push({
-          id: skin.id,
-          area: { x: btnX, y: btnY, width: btnW, height: btnH },
-        });
+        itemButtonAreas.push({ id: skin.id, area: { x: btnX, y: btnY, width: btnW, height: btnH } });
       }
-    } else {
-      // 미구매
+
+    } else if (skin.premium) {
+      // 프리미엄 전용
+      ctx.fillStyle = '#FFD700';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('PREMIUM', textX, ry + 36);
+
+      const btnY = ry + (rowH - btnH) / 2;
       ctx.fillStyle = '#FF6B35';
       ctx.beginPath();
       roundRect(ctx, btnX, btnY, btnW, btnH, 6);
@@ -367,15 +419,78 @@ function renderSkinsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
       ctx.fillStyle = '#FFF';
       ctx.font = 'bold 11px sans-serif';
       ctx.textAlign = 'center';
-      const priceText = skin.price >= 2000 ? `₩${(skin.price / 1000).toFixed(1)}K` : `₩${skin.price.toLocaleString()}`;
+      const priceText = skin.price >= 1000 ? `₩${(skin.price / 1000).toFixed(1)}K` : `₩${skin.price.toLocaleString()}`;
       ctx.fillText(priceText, btnX + btnW / 2, btnY + btnH / 2 + 4);
+      itemButtonAreas.push({ id: skin.id, area: { x: btnX, y: btnY, width: btnW, height: btnH } });
 
-      itemButtonAreas.push({
-        id: skin.id,
-        area: { x: btnX, y: btnY, width: btnW, height: btnH },
-      });
+    } else if (unlockInfo.unlockScore != null) {
+      // 기록 해금 스킨: 진행 바
+      const progress = Math.min(unlockInfo.bestHeight / unlockInfo.unlockScore, 1);
+      const barW = btnX - textX - 8;
+      const barH = 6;
+      const barY = ry + 42;
+
+      const targetM = (unlockInfo.unlockScore / 1000).toFixed(0);
+      const currentM = (unlockInfo.bestHeight / 1000).toFixed(1);
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(`${currentM}m / ${targetM}m`, textX, ry + 36);
+
+      ctx.fillStyle = 'rgba(255,255,255,0.1)';
+      ctx.beginPath();
+      roundRect(ctx, textX, barY, barW, barH, 3);
+      ctx.fill();
+      ctx.fillStyle = progress >= 1 ? '#4CAF50' : '#FF6B35';
+      ctx.beginPath();
+      roundRect(ctx, textX, barY, barW * progress, barH, 3);
+      ctx.fill();
+
+      // or ₩X 버튼
+      const btnY = ry + (rowH - btnH) / 2;
+      ctx.fillStyle = 'rgba(255,200,50,0.7)';
+      ctx.beginPath();
+      roundRect(ctx, btnX, btnY, btnW, btnH, 6);
+      ctx.fill();
+      ctx.fillStyle = '#FFF';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'center';
+      const orPrice = skin.price >= 1000 ? `₩${(skin.price / 1000).toFixed(1)}K` : `₩${skin.price.toLocaleString()}`;
+      ctx.fillText(`or ${orPrice}`, btnX + btnW / 2, btnY + btnH / 2 + 4);
+      itemButtonAreas.push({ id: skin.id, area: { x: btnX, y: btnY, width: btnW, height: btnH } });
+
+    } else {
+      // 일반 미구매
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(skin.description, textX, ry + 36);
+
+      const btnY = ry + (rowH - btnH) / 2;
+      ctx.fillStyle = '#FF6B35';
+      ctx.beginPath();
+      roundRect(ctx, btnX, btnY, btnW, btnH, 6);
+      ctx.fill();
+      ctx.fillStyle = '#FFF';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      const priceText = skin.price >= 1000 ? `₩${(skin.price / 1000).toFixed(1)}K` : `₩${skin.price.toLocaleString()}`;
+      ctx.fillText(priceText, btnX + btnW / 2, btnY + btnH / 2 + 4);
+      itemButtonAreas.push({ id: skin.id, area: { x: btnX, y: btnY, width: btnW, height: btnH } });
     }
   });
+
+  ctx.restore();
+
+  // 스크롤 인디케이터
+  if (skinsMaxScroll > 0) {
+    const indicatorH = Math.max(20, (h / totalContentH) * h);
+    const indicatorY = y + (skinsScrollY / skinsMaxScroll) * (h - indicatorH);
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.beginPath();
+    roundRect(ctx, x + w - 4, indicatorY, 4, indicatorH, 2);
+    ctx.fill();
+  }
 }
 
 // ── 업적 탭 ────────────────────────────────────────────────

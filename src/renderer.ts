@@ -1,5 +1,4 @@
-import { CarrotType, BunnyPose, type Carrot, type Particle, type Cloud, type ScorePopup, type SkinColors } from './types';
-import { getCurrentSkinColors } from './services/skin-service';
+import { CarrotType, BunnyPose, type Carrot, type Particle, type Cloud, type ScorePopup, type SkinColors, type SkinSpriteSet } from './types';
 import { assetManager } from './assets';
 
 const BUNNY_RADIUS = 18;
@@ -29,6 +28,8 @@ export interface RenderState {
   particles: Particle[];
   clouds: Cloud[];
   scorePopups: ScorePopup[];
+  skinSprites: SkinSpriteSet | null;
+  skinColors: SkinColors;
   worldToScreen(worldY: number): number;
   perspectiveScale(worldY: number): number;
 }
@@ -197,8 +198,8 @@ export function renderGround(ctx: CanvasRenderingContext2D, rs: RenderState, gro
 
 export function renderCarrots(ctx: CanvasRenderingContext2D, rs: RenderState): void {
   const useSprite = assetManager.isReady();
-  const normalSprite = useSprite ? assetManager.get('carrot_normal') : null;
-  const specialSprite = useSprite ? assetManager.get('carrot_special') : null;
+  const normalSprite = rs.skinSprites?.itemNormal ?? (useSprite ? assetManager.get('carrot_normal') : null);
+  const specialSprite = rs.skinSprites?.itemSpecial ?? (useSprite ? assetManager.get('carrot_special') : null);
 
   for (const c of rs.carrots) {
     if (c.eaten) continue;
@@ -319,9 +320,42 @@ function drawCarrotVector(
 }
 
 export function renderBunny(ctx: CanvasRenderingContext2D, rs: RenderState, x: number, screenY: number): void {
-  const skinColors = getCurrentSkinColors();
+  const skinColors = rs.skinColors;
 
-  // Sprite branch: pick sprite matching pose
+  // 1순위: 스킨 스프라이트
+  if (rs.skinSprites) {
+    const poseSprite = rs.bunnyPose === BunnyPose.JUMPING ? rs.skinSprites.jump
+      : rs.bunnyPose === BunnyPose.FALLING ? rs.skinSprites.fall
+      : rs.skinSprites.idle;
+    if (poseSprite) {
+      ctx.save();
+      ctx.translate(x, screenY);
+      const lean = clamp(rs.velX * 0.05, -0.3, 0.3);
+      ctx.rotate(lean);
+      let scaleX = 1.0;
+      let scaleY = 1.0;
+      if (rs.bunnyPose === BunnyPose.JUMPING) {
+        scaleX = 0.92;
+        scaleY = 1.10;
+      } else if (rs.bunnyPose === BunnyPose.FALLING) {
+        scaleX = 1.10;
+        scaleY = 0.92;
+      }
+      ctx.scale(scaleX, scaleY);
+      ctx.fillStyle = 'rgba(0,0,0,0.10)';
+      ctx.beginPath();
+      ctx.ellipse(2, BUNNY_RADIUS + 6, BUNNY_RADIUS * 0.9, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      const drawSize = BUNNY_RADIUS * 2.4;
+      const dispW = drawSize;
+      const dispH = drawSize * (poseSprite.height / poseSprite.width);
+      ctx.drawImage(poseSprite, -dispW / 2, -dispH / 2 - 2, dispW, dispH);
+      ctx.restore();
+      return;
+    }
+  }
+
+  // 2순위: 기본 스프라이트 (assetManager)
   const poseKey = rs.bunnyPose === BunnyPose.JUMPING ? 'bunny_jump'
     : rs.bunnyPose === BunnyPose.FALLING ? 'bunny_fall'
     : 'bunny_idle';
@@ -577,7 +611,7 @@ export function renderBunny(ctx: CanvasRenderingContext2D, rs: RenderState, x: n
 }
 
 function drawEar(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, skinColors?: SkinColors): void {
-  const sc = skinColors || getCurrentSkinColors();
+  const sc = skinColors ?? { body: '#F0E8E8', bodyLight: '#FFF5F5', bodyDark: '#D4B8B8', belly: '#FFE8E8', earInner: '#FFB3C1', nose: '#FF9EAD', cheek: 'rgba(255,182,193,0.4)' };
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);

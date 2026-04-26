@@ -22,6 +22,13 @@ export const PRODUCT_REMOVE_ADS = 'bunnyhop_remove_ads';
 export const PRODUCT_SKIN_PACK_PINK = 'bunnyhop_skin_pink';
 export const PRODUCT_SKIN_PACK_GOLDEN = 'bunnyhop_skin_golden';
 export const PRODUCT_SKIN_PACK_SHADOW = 'bunnyhop_skin_shadow';
+export const PRODUCT_SKIN_PACK_SHADOW_NINJA = 'bunnyhop_skin_shadow_ninja';
+export const PRODUCT_SKIN_PACK_OCEAN_PIRATE = 'bunnyhop_skin_ocean_pirate';
+export const PRODUCT_SKIN_PACK_METAL_HERO = 'bunnyhop_skin_metal_hero';
+export const PRODUCT_SKIN_PACK_THUNDER_GUARDIAN = 'bunnyhop_skin_thunder_guardian';
+export const PRODUCT_SKIN_PACK_JUNGLE_KING = 'bunnyhop_skin_jungle_king';
+export const PRODUCT_SKIN_PACK_CLAW_FIGHTER = 'bunnyhop_skin_claw_fighter';
+export const PRODUCT_SKIN_PACK_SPACE_EXPLORER = 'bunnyhop_skin_space_explorer';
 
 // ── 상품 목록 (표시용 기본값 — 실제 가격은 스토어에서 가져옴) ─
 const DEFAULT_PRODUCTS: IAPProduct[] = [

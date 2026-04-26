@@ -67,6 +67,15 @@ export interface SkinColors {
   cheek: string;
 }
 
+export interface SkinSpriteSet {
+  idle: HTMLImageElement | null;
+  jump: HTMLImageElement | null;
+  fall: HTMLImageElement | null;
+  itemNormal: HTMLImageElement | null;
+  itemSpecial: HTMLImageElement | null;
+  thumb: HTMLImageElement | null;
+}
+
 export interface BunnySkin {
   id: string;
   name: string;
@@ -75,6 +84,9 @@ export interface BunnySkin {
   price: number;
   productId: string;
   unlocked: boolean;
+  spriteDir?: string;
+  unlockScore?: number;
+  premium?: boolean;
 }
 
 export interface Achievement {

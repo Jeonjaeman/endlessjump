@@ -7,7 +7,8 @@ import { renderRankingScreen, getTabHitArea, getReviveHitArea } from './ui/ranki
 import { showProfileModal } from './ui/profile-modal';
 import { initAds, showBanner, hideBanner, showInterstitialOnGameOver, isRewardedReady, showRewardedAd, areAdsRemoved } from './services/ad-service';
 import { initIAP } from './services/iap-service';
-import { initSkins } from './services/skin-service';
+import { initSkins, getCurrentSkinColors } from './services/skin-service';
+import { skinAssetLoader } from './skin-assets';
 import { initAchievements, onGameOver as achOnGameOver, onCarrotEaten as achOnCarrotEaten, popRecentlyCompleted } from './services/achievement-service';
 import { isShopOpen, openShop, renderShop, renderShopButton, getShopButtonArea, renderAchievementPopup, queueAchievementPopup, clearAchievementPopups } from './ui/shop-screen';
 import { InputManager } from './input';
@@ -597,6 +598,8 @@ export class Game {
       scoreBounce: this.scoreBounce, scoreColor: this.scoreColor,
       carrots: this.carrots, particles: this.particles, clouds: this.clouds,
       scorePopups: this.scorePopups,
+      skinSprites: skinAssetLoader.getCurrentSkinSprites(),
+      skinColors: getCurrentSkinColors(),
       worldToScreen: (y: number) => self.worldToScreen(y),
       perspectiveScale: (y: number) => self.perspectiveScale(y),
     };
