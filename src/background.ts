@@ -43,6 +43,12 @@ function getZoneIndex(height: number): number {
   return pos - (BG_SEQUENCE.length - 1) + 1; // 1, 2, 3
 }
 
+// ── 패럴랙스 설정 ──────────────────────────────────────────
+const PARALLAX_SCALE = 1.08;        // 배경을 8% 크게 그려서 여유 확보
+const PARALLAX_X_FACTOR = 0.015;    // 토끼 X 이동 → 배경 반대 이동 비율
+const PARALLAX_Y_FACTOR = 0.008;    // 수직 속도 → 배경 이동 비율
+const PARALLAX_SMOOTH = 0.08;       // 부드러운 보간 속도
+
 export class BackgroundRenderer {
   private currentKey: AssetKey | null = null;
   private prevKey: AssetKey | null = null;
@@ -51,7 +57,30 @@ export class BackgroundRenderer {
   private fallbackGrad: CanvasGradient | null = null;
   private fallbackH = 0;
 
-  render(ctx: CanvasRenderingContext2D, w: number, h: number, height: number, elapsed: number, isPlaying: boolean): void {
+  // 패럴랙스 상태
+  private offsetX = 0;
+  private offsetY = 0;
+  private targetOffsetX = 0;
+  private targetOffsetY = 0;
+
+  render(
+    ctx: CanvasRenderingContext2D, w: number, h: number,
+    height: number, elapsed: number, isPlaying: boolean,
+    bunnyX?: number, velY?: number,
+  ): void {
+    // 패럴랙스 목표값 계산
+    if (bunnyX != null) {
+      const centerX = w / 2;
+      this.targetOffsetX = -(bunnyX - centerX) * PARALLAX_X_FACTOR;
+    }
+    if (velY != null) {
+      this.targetOffsetY = velY * PARALLAX_Y_FACTOR;
+    }
+
+    // 부드러운 보간
+    this.offsetX += (this.targetOffsetX - this.offsetX) * PARALLAX_SMOOTH;
+    this.offsetY += (this.targetOffsetY - this.offsetY) * PARALLAX_SMOOTH;
+
     const targetKey = this.pickBackground(height, elapsed, isPlaying);
 
     if (targetKey !== this.currentKey) {
@@ -66,19 +95,29 @@ export class BackgroundRenderer {
     if (currentImg) {
       if (this.fadeProgress < 1 && prevImg) {
         ctx.globalAlpha = 1.0;
-        ctx.drawImage(prevImg, 0, 0, w, h);
+        this.drawParallax(ctx, prevImg, w, h);
         ctx.globalAlpha = this.fadeProgress;
-        ctx.drawImage(currentImg, 0, 0, w, h);
+        this.drawParallax(ctx, currentImg, w, h);
         ctx.globalAlpha = 1.0;
         this.fadeProgress = Math.min(1, this.fadeProgress + 1 / FADE_DURATION);
       } else {
-        ctx.drawImage(currentImg, 0, 0, w, h);
+        this.drawParallax(ctx, currentImg, w, h);
         this.fadeProgress = 1;
       }
       return;
     }
 
     this.renderFallback(ctx, w, h);
+  }
+
+  private drawParallax(ctx: CanvasRenderingContext2D, img: HTMLImageElement, w: number, h: number): void {
+    const scaledW = w * PARALLAX_SCALE;
+    const scaledH = h * PARALLAX_SCALE;
+    const extraW = (scaledW - w) / 2;
+    const extraH = (scaledH - h) / 2;
+    const dx = -extraW + this.offsetX;
+    const dy = -extraH + this.offsetY;
+    ctx.drawImage(img, dx, dy, scaledW, scaledH);
   }
 
   private pickBackground(height: number, elapsed: number, isPlaying: boolean): AssetKey {

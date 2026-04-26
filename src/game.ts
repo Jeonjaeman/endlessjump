@@ -652,7 +652,7 @@ export class Game {
     const elapsed = this.state === GameState.PLAYING
       ? (performance.now() - this.startTime)
       : 0;
-    this.bg.render(ctx, this.w, this.h, this.heightReached, elapsed, this.state === GameState.PLAYING);
+    this.bg.render(ctx, this.w, this.h, this.heightReached, elapsed, this.state === GameState.PLAYING, this.bunnyX, this.velY);
   }
 
   private handleReviveTap(x: number, y: number): boolean {
