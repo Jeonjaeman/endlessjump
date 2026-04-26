@@ -9,7 +9,7 @@ import { initIAP } from './services/iap-service';
 import { initSkins, getCurrentSkinColors } from './services/skin-service';
 import { initAchievements, onGameOver as achOnGameOver, onCarrotEaten as achOnCarrotEaten, popRecentlyCompleted } from './services/achievement-service';
 import { isShopOpen, openShop, closeShop, handleShopTap, renderShop, renderShopButton, getShopButtonArea, renderAchievementPopup, queueAchievementPopup, clearAchievementPopups } from './ui/shop-screen';
-import { SkyRenderer } from './sky-renderer';
+import { assetManager } from './assets';
 
 const GRAVITY = 0.6;
 const JUMP_VELOCITY = -15;
@@ -45,19 +45,6 @@ function rand(min: number, max: number): number {
   return min + Math.random() * (max - min);
 }
 
-function lerpColor(a: string, b: string, t: number): string {
-  const pa = hexToRgb(a);
-  const pb = hexToRgb(b);
-  const r = Math.round(pa.r + (pb.r - pa.r) * t);
-  const g = Math.round(pa.g + (pb.g - pa.g) * t);
-  const bl = Math.round(pa.b + (pb.b - pa.b) * t);
-  return `rgb(${r},${g},${bl})`;
-}
-
-function hexToRgb(hex: string): { r: number; g: number; b: number } {
-  const n = parseInt(hex.slice(1), 16);
-  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
-}
 
 function clamp(v: number, min: number, max: number): number {
   return v < min ? min : v > max ? max : v;
@@ -114,9 +101,6 @@ export class Game {
   private hasUsedRevive = false;
   private reviveAvailable = false;
 
-  // Sky renderer (WebGL)
-  private skyRenderer = new SkyRenderer();
-
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     const ctx = canvas.getContext('2d');
@@ -164,7 +148,6 @@ export class Game {
     this.canvas.width = this.w * dpr;
     this.canvas.height = this.h * dpr;
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.skyRenderer.resize(this.w * dpr, this.h * dpr);
     // PLAYING 상태에서는 groundY 변경하지 않기 (부활/게임 중 좌표 꼬임 방지)
     if (this.state !== GameState.PLAYING) {
       this.groundY = this.h * 10;
@@ -908,40 +891,25 @@ export class Game {
     ctx.restore();
   }
 
-  private getSkyColors(): [string, string] {
-    const elapsed = this.state === GameState.PLAYING
-      ? (performance.now() - this.startTime)
-      : 0;
-    const cycle = (elapsed % DAY_CYCLE_MS) / DAY_CYCLE_MS;
-
-    if (cycle < 0.25) {
-      const t = cycle / 0.25;
-      return [lerpColor('#87CEEB', '#FF8C42', t), lerpColor('#E0F0FF', '#FFB366', t)];
-    } else if (cycle < 0.5) {
-      const t = (cycle - 0.25) / 0.25;
-      return [lerpColor('#FF8C42', '#1a1a3e', t), lerpColor('#FFB366', '#2d2d6b', t)];
-    } else if (cycle < 0.75) {
-      const t = (cycle - 0.5) / 0.25;
-      return [lerpColor('#1a1a3e', '#2d4a7a', t), lerpColor('#2d2d6b', '#87CEEB', t)];
-    } else {
-      const t = (cycle - 0.75) / 0.25;
-      return [lerpColor('#2d4a7a', '#87CEEB', t), lerpColor('#87CEEB', '#E0F0FF', t)];
-    }
-  }
+  private skyGradientCache: CanvasGradient | null = null;
+  private skyGradientH = 0;
 
   private renderBackground(ctx: CanvasRenderingContext2D): void {
-    const elapsed = this.state === GameState.PLAYING
-      ? (performance.now() - this.startTime)
-      : 0;
-    // 비플레이 상태에서는 밤하늘(0.4)을 기본으로 표시
-    const cycle = this.state === GameState.PLAYING
-      ? (elapsed % DAY_CYCLE_MS) / DAY_CYCLE_MS
-      : 0.4;
-    const timeSec = performance.now() * 0.001;
-    this.skyRenderer.render(ctx, this.w, this.h, timeSec, cycle, this.heightReached);
+    if (!this.skyGradientCache || this.skyGradientH !== this.h) {
+      this.skyGradientH = this.h;
+      const grad = ctx.createLinearGradient(0, 0, 0, this.h);
+      grad.addColorStop(0, '#1a1a3e');
+      grad.addColorStop(1, '#2d4a7a');
+      this.skyGradientCache = grad;
+    }
+    ctx.fillStyle = this.skyGradientCache;
+    ctx.fillRect(0, 0, this.w, this.h);
   }
 
   private renderClouds3D(ctx: CanvasRenderingContext2D): void {
+    const useSprite = assetManager.isReady() && assetManager.has('cloud');
+    const cloudSprite = useSprite ? assetManager.get('cloud') : null;
+
     for (const cl of this.clouds) {
       const screenY = this.worldToScreen(cl.y) * cl.z + (1 - cl.z) * this.h * 0.3;
       if (screenY < -200 || screenY > this.h + 200) continue;
@@ -950,6 +918,16 @@ export class Game {
       const cw = cl.width * scale;
       const ch = cw * 0.35;
 
+      // Sprite branch: 스프라이트가 있으면 사용
+      if (cloudSprite) {
+        ctx.save();
+        ctx.globalAlpha = cl.opacity * (0.5 + cl.z * 0.5);
+        ctx.drawImage(cloudSprite, cl.x - cw / 2, screenY - ch / 2, cw, ch);
+        ctx.restore();
+        continue;
+      }
+
+      // Vector fallback (기존 코드)
       ctx.save();
       ctx.globalAlpha = cl.opacity * (0.5 + cl.z * 0.5);
 
@@ -984,6 +962,31 @@ export class Game {
     const gy = this.worldToScreen(this.groundY);
     if (gy > this.h + 200) return;
 
+    const useSprite = assetManager.isReady() && assetManager.has('ground');
+    const groundSprite = useSprite ? assetManager.get('ground') : null;
+    const grassSprite = useSprite ? assetManager.get('grass') : null;
+
+    // Sprite branch: 지면 타일 가로 반복 + 그 아래 채우기
+    if (groundSprite) {
+      const tileW = groundSprite.width || 64;
+      const tileH = groundSprite.height || 64;
+      // 잔디 (있으면 윗 라인으로)
+      if (grassSprite) {
+        const grassH = grassSprite.height || 8;
+        for (let bx = 0; bx < this.w; bx += grassSprite.width || 64) {
+          ctx.drawImage(grassSprite, bx, gy - grassH + 2);
+        }
+      }
+      // 지면 타일 가로 반복 + 화면 아래까지 채움
+      for (let row = gy; row < this.h + tileH; row += tileH) {
+        for (let bx = 0; bx < this.w; bx += tileW) {
+          ctx.drawImage(groundSprite, bx, row);
+        }
+      }
+      return;
+    }
+
+    // Vector fallback (기존 코드)
     const blockH = 20;
     const rows = 8;
 
@@ -1027,6 +1030,10 @@ export class Game {
   }
 
   private renderCarrots3D(ctx: CanvasRenderingContext2D): void {
+    const useSprite = assetManager.isReady();
+    const normalSprite = useSprite ? assetManager.get('carrot_normal') : null;
+    const specialSprite = useSprite ? assetManager.get('carrot_special') : null;
+
     for (const c of this.carrots) {
       if (c.eaten) continue;
       const sy = this.worldToScreen(c.y);
@@ -1034,6 +1041,28 @@ export class Game {
 
       const scale = this.perspectiveScale(c.y);
 
+      // Sprite branch
+      const sprite = c.type === CarrotType.SPECIAL ? specialSprite : normalSprite;
+      if (sprite) {
+        const sw = sprite.width * scale * 0.5;
+        const sh = sprite.height * scale * 0.5;
+        ctx.save();
+        if (c.type === CarrotType.SPECIAL) {
+          // 황금 당근 글로우
+          const glowGrad = ctx.createRadialGradient(c.x, sy, 5, c.x, sy, 28 * scale);
+          glowGrad.addColorStop(0, 'rgba(255, 215, 0, 0.4)');
+          glowGrad.addColorStop(1, 'rgba(255, 215, 0, 0)');
+          ctx.fillStyle = glowGrad;
+          ctx.beginPath();
+          ctx.arc(c.x, sy, 28 * scale, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.drawImage(sprite, c.x - sw / 2, sy - sh / 2, sw, sh);
+        ctx.restore();
+        continue;
+      }
+
+      // Vector fallback (기존 코드)
       if (c.type === CarrotType.NORMAL) {
         this.drawCarrot3D(ctx, c.x, sy, scale, '#FF6B35', '#E85520', '#4CAF50', '#388E3C', false);
       } else if (c.type === CarrotType.SPECIAL) {
@@ -1126,6 +1155,49 @@ export class Game {
 
   private renderBunny3D(ctx: CanvasRenderingContext2D, x: number, screenY: number): void {
     const skinColors = getCurrentSkinColors();
+
+    // Sprite branch: pose에 맞는 스프라이트 선택
+    const poseKey = this.bunnyPose === BunnyPose.JUMPING ? 'bunny_jump'
+      : this.bunnyPose === BunnyPose.FALLING ? 'bunny_fall'
+      : 'bunny_idle';
+    const useSprite = assetManager.isReady() && assetManager.has('bunny_idle');
+    const bunnySprite = useSprite ? (assetManager.get(poseKey) ?? assetManager.get('bunny_idle')) : null;
+
+    if (bunnySprite) {
+      ctx.save();
+      ctx.translate(x, screenY);
+      const lean = clamp(this.velX * 0.05, -0.3, 0.3);
+      ctx.rotate(lean);
+
+      // Pose에 따른 squash & stretch는 스프라이트에서도 약하게 적용
+      let scaleX = 1.0;
+      let scaleY = 1.0;
+      if (this.bunnyPose === BunnyPose.JUMPING) {
+        scaleX = 0.92;
+        scaleY = 1.10;
+      } else if (this.bunnyPose === BunnyPose.FALLING) {
+        scaleX = 1.10;
+        scaleY = 0.92;
+      }
+      ctx.scale(scaleX, scaleY);
+
+      // 그림자
+      ctx.fillStyle = 'rgba(0,0,0,0.10)';
+      ctx.beginPath();
+      ctx.ellipse(2, BUNNY_RADIUS + 6, BUNNY_RADIUS * 0.9, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 스프라이트 그리기 — BUNNY_RADIUS=18 기준 약 64x64 표시 영역
+      const drawSize = BUNNY_RADIUS * 2.4; // 약 43px (스프라이트 슈퍼샘플링 가정)
+      const dispW = drawSize;
+      const dispH = drawSize * (bunnySprite.height / bunnySprite.width);
+      ctx.drawImage(bunnySprite, -dispW / 2, -dispH / 2 - 2, dispW, dispH);
+
+      ctx.restore();
+      return;
+    }
+
+    // Vector fallback (기존 코드)
     ctx.save();
     ctx.translate(x, screenY);
 
