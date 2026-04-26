@@ -94,6 +94,27 @@ class SkinAssetLoaderImpl {
   setCurrentSkin(skinId: string): void {
     this.currentSkinId = skinId;
   }
+
+  // ── 썸네일 전용 (상점 프리뷰) ──────────────────────────────
+  private thumbCache = new Map<string, HTMLImageElement>();
+  private thumbsLoaded = false;
+
+  async loadAllThumbs(skinDirs: { id: string; spriteDir: string }[]): Promise<void> {
+    if (this.thumbsLoaded) return;
+    const tasks = skinDirs.map(async ({ id, spriteDir }) => {
+      const img = await tryLoadImage(`/assets/skins/${spriteDir}/thumb.webp`);
+      if (img) this.thumbCache.set(id, img);
+    });
+    await Promise.all(tasks);
+    this.thumbsLoaded = true;
+  }
+
+  getThumb(skinId: string): HTMLImageElement | null {
+    // 풀 캐시에 있으면 거기서, 아니면 썸네일 캐시에서
+    const full = this.cache.get(skinId);
+    if (full?.thumb) return full.thumb;
+    return this.thumbCache.get(skinId) ?? null;
+  }
 }
 
 export const skinAssetLoader = new SkinAssetLoaderImpl();

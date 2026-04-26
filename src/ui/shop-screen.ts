@@ -50,6 +50,13 @@ export function openShop(): void {
   shopOpen = true;
   shopTab = 'items';
   skinsScrollY = 0;
+
+  // 스킨 썸네일 프리로드
+  const skins = getSkins();
+  const skinDirs = skins
+    .filter(s => s.spriteDir)
+    .map(s => ({ id: s.id, spriteDir: s.spriteDir! }));
+  skinAssetLoader.loadAllThumbs(skinDirs).catch(() => {});
 }
 
 export function closeShop(): void {
@@ -353,8 +360,8 @@ function renderSkinsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
     const previewX = x + 8;
     const previewY = ry + (rowH - previewSize) / 2;
 
-    // 프리뷰: 스킨 스프라이트 thumb → 기본 bunny_idle 에셋 → 색상 원 폴백
-    const thumbImg = spriteSet?.thumb;
+    // 프리뷰: 썸네일 캐시 → 풀 스프라이트 thumb → 기본 bunny_idle → 색상 원 폴백
+    const thumbImg = skinAssetLoader.getThumb(skin.id) ?? spriteSet?.thumb ?? null;
     const defaultBunnyImg = (!skin.spriteDir && assetManager.has('bunny_idle')) ? assetManager.get('bunny_idle') : null;
     const previewImg = thumbImg ?? defaultBunnyImg;
 
