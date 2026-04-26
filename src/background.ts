@@ -44,10 +44,10 @@ function getZoneIndex(height: number): number {
 }
 
 // ── 패럴랙스 설정 ──────────────────────────────────────────
-const PARALLAX_SCALE = 1.08;        // 배경을 8% 크게 그려서 여유 확보
-const PARALLAX_X_FACTOR = 0.015;    // 토끼 X 이동 → 배경 반대 이동 비율
-const PARALLAX_Y_FACTOR = 0.008;    // 수직 속도 → 배경 이동 비율
-const PARALLAX_SMOOTH = 0.08;       // 부드러운 보간 속도
+const PARALLAX_SCALE = 1.15;        // 배경을 15% 크게 그려서 여유 확보
+const PARALLAX_X_FACTOR = 0.06;     // 토끼 X 이동 → 배경 반대 이동 비율
+const PARALLAX_Y_FACTOR = 0.025;    // 수직 속도 → 배경 이동 비율
+const PARALLAX_SMOOTH = 0.12;       // 부드러운 보간 속도
 
 export class BackgroundRenderer {
   private currentKey: AssetKey | null = null;

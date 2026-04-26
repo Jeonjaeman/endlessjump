@@ -134,6 +134,7 @@ const ALL_SKINS: BunnySkin[] = [
     price: 2200,
     productId: PRODUCT_SKIN_PACK_SHADOW,
     unlocked: false,
+    spriteDir: 'shadow',
   },
   {
     id: 'shadow_ninja',
@@ -144,7 +145,7 @@ const ALL_SKINS: BunnySkin[] = [
     productId: PRODUCT_SKIN_PACK_SHADOW_NINJA,
     unlocked: false,
     spriteDir: 'shadow_ninja',
-    unlockScore: 40000,
+    unlockScore: 50000,
   },
   {
     id: 'ocean_pirate',
@@ -155,7 +156,7 @@ const ALL_SKINS: BunnySkin[] = [
     productId: PRODUCT_SKIN_PACK_OCEAN_PIRATE,
     unlocked: false,
     spriteDir: 'ocean_pirate',
-    unlockScore: 60000,
+    unlockScore: 100000,
   },
   {
     id: 'metal_hero',
@@ -166,7 +167,7 @@ const ALL_SKINS: BunnySkin[] = [
     productId: PRODUCT_SKIN_PACK_METAL_HERO,
     unlocked: false,
     spriteDir: 'metal_hero',
-    unlockScore: 80000,
+    unlockScore: 150000,
   },
   {
     id: 'thunder_guardian',
@@ -177,7 +178,7 @@ const ALL_SKINS: BunnySkin[] = [
     productId: PRODUCT_SKIN_PACK_THUNDER_GUARDIAN,
     unlocked: false,
     spriteDir: 'thunder_guardian',
-    unlockScore: 100000,
+    unlockScore: 200000,
   },
   {
     id: 'jungle_king',
