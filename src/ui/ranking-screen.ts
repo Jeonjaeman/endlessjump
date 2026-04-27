@@ -156,7 +156,7 @@ export function renderRankingScreen(
   // 클립 영역으로 스크롤 마스크
   ctx.save();
   ctx.beginPath();
-  ctx.rect(listX - 4, listY + 10, listW + 8, LIST_CLIP_H);
+  ctx.rect(listX - 4, listY + 2, listW + 8, LIST_CLIP_H + 8);
   ctx.clip();
   ctx.translate(0, -scrollY);
 
