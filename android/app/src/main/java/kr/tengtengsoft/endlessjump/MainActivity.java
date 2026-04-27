@@ -1,4 +1,4 @@
-package kr.tengtengsoft.bunnyhop;
+package kr.tengtengsoft.endlessjump;
 
 import android.os.Bundle;
 import android.view.View;
