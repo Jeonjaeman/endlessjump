@@ -572,16 +572,16 @@ export class Game {
 
   private async collectCommentThenSubmit(heightMm: number, score: number): Promise<void> {
     const skinId = getSelectedSkinId();
-    // 먼저 점수 제출 + 랭킹 로드
-    await this.submitAndLoadRankings(heightMm, score, skinId, '');
-    // TOP 10 안이면 댓글 팝업
-    const inTop10 = this.rankings.some(r => r.is_me && r.rank <= 10)
-      || (this.myRank !== null && this.myRank.rank <= 10);
-    if (inTop10) {
+
+    // 현재 기록이 TOP 10에 들 수 있는지 체크 (제출 전에 확인)
+    const top10Heights = this.rankings.map(r => r.height);
+    const wouldBeTop10 = top10Heights.length < 10 || heightMm > Math.min(...top10Heights);
+
+    if (wouldBeTop10) {
       const comment = await this.showCommentOverlay();
-      if (comment) {
-        await this.submitAndLoadRankings(heightMm, score, skinId, comment);
-      }
+      await this.submitAndLoadRankings(heightMm, score, skinId, comment);
+    } else {
+      await this.submitAndLoadRankings(heightMm, score, skinId, '');
     }
   }
 
