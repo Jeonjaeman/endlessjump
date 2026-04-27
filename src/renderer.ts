@@ -725,24 +725,103 @@ export function renderHUD(ctx: CanvasRenderingContext2D, rs: RenderState): void 
 }
 
 export function renderStartScreen(ctx: CanvasRenderingContext2D, w: number, h: number, bestScore: number, bestHeight: number): void {
-  ctx.fillStyle = 'rgba(0,0,0,0.3)';
-  ctx.fillRect(0, 0, w, h);
+  // 상단 그라디언트 오버레이 (제목 가독성)
+  const overlay = ctx.createLinearGradient(0, 0, 0, h * 0.6);
+  overlay.addColorStop(0, 'rgba(0,0,0,0.4)');
+  overlay.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = overlay;
+  ctx.fillRect(0, 0, w, h * 0.6);
 
-  ctx.fillStyle = '#FFF';
-  ctx.font = 'bold 36px sans-serif';
+  const cx = w / 2;
+  const titleY = h * 0.22;
+
+  // 타이틀: 무한의당근 (큰 글씨 + 글로우)
+  ctx.save();
   ctx.textAlign = 'center';
-  ctx.shadowColor = 'rgba(0,0,0,0.4)';
-  ctx.shadowBlur = 8;
-  ctx.fillText('\uBB34\uD55C\uC758\uB2F9\uADFC', w / 2, h / 3);
+
+  // 글로우 효과
+  ctx.shadowColor = '#FF6B35';
+  ctx.shadowBlur = 20;
+  ctx.fillStyle = '#FF6B35';
+  ctx.font = 'bold 44px sans-serif';
+  ctx.fillText('\uBB34\uD55C\uC758\uB2F9\uADFC', cx, titleY);
+
+  // 메인 텍스트 (위에 겹침)
+  ctx.shadowColor = 'rgba(0,0,0,0.5)';
+  ctx.shadowBlur = 6;
+  ctx.fillStyle = '#FFF';
+  ctx.fillText('\uBB34\uD55C\uC758\uB2F9\uADFC', cx, titleY);
   ctx.shadowBlur = 0;
 
-  ctx.font = '20px sans-serif';
-  ctx.fillStyle = 'rgba(255,255,255,0.8)';
-  ctx.fillText('Tap to Start', w / 2, h / 3 + 50);
+  // 서브타이틀
+  ctx.font = 'bold 14px sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillText('Endless Jump', cx, titleY + 28);
 
+  ctx.restore();
+
+  // Tap to Start (깜빡이는 효과)
+  const blink = Math.sin(Date.now() * 0.004) * 0.3 + 0.7;
+  ctx.globalAlpha = blink;
+  ctx.font = 'bold 20px sans-serif';
+  ctx.fillStyle = '#FFF';
+  ctx.textAlign = 'center';
+  ctx.fillText('Tap to Start', cx, h * 0.42);
+  ctx.globalAlpha = 1.0;
+
+  // 하단 글라스 카드 (Best 기록 + 스킨 수)
   if (bestHeight > 0) {
-    ctx.font = '16px sans-serif';
+    const cardW = Math.min(w - 40, 260);
+    const cardH = 60;
+    const cardX = cx - cardW / 2;
+    const cardY = h * 0.52;
+
+    // 글라스 배경
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.beginPath();
+    startScreenRoundRect(ctx, cardX, cardY, cardW, cardH, 14);
+    ctx.fill();
+
+    // 상단 하이라이트
+    const hlG = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardH * 0.4);
+    hlG.addColorStop(0, 'rgba(255,255,255,0.12)');
+    hlG.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = hlG;
+    ctx.beginPath();
+    startScreenRoundRect(ctx, cardX, cardY, cardW, cardH * 0.4, 14);
+    ctx.fill();
+
+    // 테두리
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    startScreenRoundRect(ctx, cardX, cardY, cardW, cardH, 14);
+    ctx.stroke();
+
+    // Best 기록
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 13px sans-serif';
     ctx.fillStyle = '#FFD700';
-    ctx.fillText(`BEST: ${bestHeight}mm / ${bestScore} carrots`, w / 2, h / 3 + 90);
+    ctx.fillText('\uD83C\uDFC6 BEST RECORD', cx, cardY + 22);
+
+    ctx.font = '15px sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fillText(`${bestHeight}mm  \u00B7  ${bestScore} carrots`, cx, cardY + 44);
   }
+}
+
+function startScreenRoundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number, r: number,
+): void {
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
 }

@@ -760,9 +760,13 @@ export class Game {
       renderParticles(ctx, rs);
       renderHUD(ctx, rs);
     } else if (this.state === GameState.START) {
-      renderGround(ctx, rs, this.groundY);
-      renderCarrots(ctx, rs);
-      renderBunny(ctx, rs, this.w / 2, this.worldToScreen(this.groundY - BUNNY_RADIUS - 10));
+      // 시작 화면: 카메라를 위로 올려서 하늘을 더 보여줌
+      const startCameraY = this.groundY - this.h * 0.7;
+      const startWorldToScreen = (wy: number) => wy - startCameraY + this.h / 2;
+      const startRs = { ...rs, worldToScreen: startWorldToScreen, cameraY: startCameraY };
+      renderGround(ctx, startRs, this.groundY);
+      renderCarrots(ctx, startRs);
+      renderBunny(ctx, startRs, this.w / 2, startWorldToScreen(this.groundY - BUNNY_RADIUS - 10));
       renderStartScreen(ctx, this.w, this.h, this.bestScore, this.bestHeight);
     } else if (this.state === GameState.GAME_OVER) {
       renderGround(ctx, rs, this.groundY);
