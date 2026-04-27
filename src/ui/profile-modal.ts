@@ -1,4 +1,5 @@
-import { getLocalProfile, saveLocalProfile, updateProfile, type LocalProfile } from '../services/auth';
+import { getLocalProfile, saveLocalProfile, updateProfile, getSupabaseUserId, type LocalProfile } from '../services/auth';
+import { getSupabase } from '../services/supabase';
 
 const COUNTRY_FLAGS: [string, string, string][] = [
   ['KR', '\u{1F1F0}\u{1F1F7}', '한국'], ['US', '\u{1F1FA}\u{1F1F8}', '미국'], ['JP', '\u{1F1EF}\u{1F1F5}', '일본'],
@@ -102,13 +103,34 @@ function createModal(profile: LocalProfile): void {
   }
   box.appendChild(flagsDiv);
 
+  const errorMsg = el('p', `
+    margin:0 0 10px;font-size:13px;color:#FF6B6B;min-height:18px;
+  `, '');
+  box.appendChild(errorMsg);
+
   const saveBtn = el('button', `
     width:100%;padding:12px;background:#FF6B35;
     border:none;border-radius:8px;color:#fff;font-size:16px;font-weight:bold;
     cursor:pointer;
   `, '저장');
-  saveBtn.addEventListener('click', () => {
+  saveBtn.addEventListener('click', async () => {
     const nickname = input.value.trim() || 'Bunny';
+    errorMsg.textContent = '';
+
+    const sb = getSupabase();
+    if (sb) {
+      const myId = getSupabaseUserId();
+      const { data } = await sb.from('profiles')
+        .select('id')
+        .eq('nickname', nickname)
+        .neq('id', myId ?? '')
+        .limit(1);
+      if (data && data.length > 0) {
+        errorMsg.textContent = '이미 사용 중인 닉네임입니다.';
+        return;
+      }
+    }
+
     const newProfile: LocalProfile = { nickname, country_code: selectedCode };
     saveLocalProfile(newProfile);
     updateProfile(newProfile);
