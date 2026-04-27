@@ -769,43 +769,40 @@ export function renderStartScreen(ctx: CanvasRenderingContext2D, w: number, h: n
   ctx.fillText('Tap to Start', cx, h * 0.42);
   ctx.globalAlpha = 1.0;
 
-  // 하단 글라스 카드 (Best 기록 + 스킨 수)
+  // 하단 Neobrutalism 카드 (Best 기록)
   if (bestHeight > 0) {
     const cardW = Math.min(w - 40, 260);
     const cardH = 60;
     const cardX = cx - cardW / 2;
     const cardY = h * 0.52;
 
-    // 글라스 배경
-    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    // 오프셋 그림자
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
     ctx.beginPath();
-    startScreenRoundRect(ctx, cardX, cardY, cardW, cardH, 14);
+    startScreenRoundRect(ctx, cardX + 3, cardY + 3, cardW, cardH, 10);
     ctx.fill();
 
-    // 상단 하이라이트
-    const hlG = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardH * 0.4);
-    hlG.addColorStop(0, 'rgba(255,255,255,0.12)');
-    hlG.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = hlG;
+    // 배경
+    ctx.fillStyle = '#1e1e32';
     ctx.beginPath();
-    startScreenRoundRect(ctx, cardX, cardY, cardW, cardH * 0.4, 14);
+    startScreenRoundRect(ctx, cardX, cardY, cardW, cardH, 10);
     ctx.fill();
 
-    // 테두리
-    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-    ctx.lineWidth = 1;
+    // 굵은 테두리
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
-    startScreenRoundRect(ctx, cardX, cardY, cardW, cardH, 14);
+    startScreenRoundRect(ctx, cardX, cardY, cardW, cardH, 10);
     ctx.stroke();
 
     // Best 기록
     ctx.textAlign = 'center';
     ctx.font = 'bold 13px sans-serif';
     ctx.fillStyle = '#FFD700';
-    ctx.fillText('\uD83C\uDFC6 BEST RECORD', cx, cardY + 22);
+    ctx.fillText('\uD83C\uDFC6 BEST RECORD', cx, cardY + 24);
 
-    ctx.font = '15px sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.font = 'bold 15px sans-serif';
+    ctx.fillStyle = '#FFF';
     ctx.fillText(`${bestHeight}mm  \u00B7  ${bestScore} carrots`, cx, cardY + 44);
   }
 }
