@@ -24,48 +24,61 @@ export class InputManager {
     let lastDragY = 0;
     let shopWasOpen = false;
 
+    // clientX/clientY → 캔버스 상대 좌표 변환
+    const toCanvasX = (clientX: number) => {
+      const rect = canvas.getBoundingClientRect();
+      return clientX - rect.left;
+    };
+    const toCanvasY = (clientY: number) => {
+      const rect = canvas.getBoundingClientRect();
+      return clientY - rect.top;
+    };
+
     // ── Touch ──────────────────────────────────────────────────
     canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
       cb.initAudio();
       const t = e.touches[0];
+      const cx = toCanvasX(t.clientX);
+      const cy = toCanvasY(t.clientY);
       if (isShopOpen()) {
         shopWasOpen = true;
-        handleShopPointerDown(t.clientX, t.clientY);
-        handleShopTap(t.clientX, t.clientY);
+        handleShopPointerDown(cx, cy);
+        handleShopTap(cx, cy);
         return;
       }
       shopWasOpen = false;
       if (cb.state === GameState.START) { cb.onStartGame(); return; }
       if (cb.state === GameState.GAME_OVER) {
-        dragStartX = t.clientX;
-        dragStartY = t.clientY;
-        lastDragY = t.clientY;
+        dragStartX = cx;
+        dragStartY = cy;
+        lastDragY = cy;
         isDragging = false;
         return;
       }
-      cb.onTouchStart(t.clientX);
+      cb.onTouchStart(cx);
     });
 
     canvas.addEventListener('touchmove', (e) => {
       e.preventDefault();
+      const t = e.touches[0];
+      const cx = toCanvasX(t.clientX);
+      const cy = toCanvasY(t.clientY);
       if (isShopOpen()) {
-        const t = e.touches[0];
-        handleShopPointerMove(t.clientX, t.clientY);
+        handleShopPointerMove(cx, cy);
         return;
       }
       if (cb.state === GameState.GAME_OVER) {
-        const t = e.touches[0];
-        const totalDy = Math.abs(t.clientY - dragStartY);
+        const totalDy = Math.abs(cy - dragStartY);
         if (!isDragging && totalDy > DRAG_THRESHOLD) isDragging = true;
         if (isDragging) {
-          cb.onGameOverDrag(lastDragY - t.clientY);
-          lastDragY = t.clientY;
+          cb.onGameOverDrag(lastDragY - cy);
+          lastDragY = cy;
         }
         return;
       }
       if (cb.state !== GameState.PLAYING) return;
-      cb.onTouchMove(e.touches[0].clientX);
+      cb.onTouchMove(cx);
     });
 
     canvas.addEventListener('touchend', (e) => {
@@ -84,40 +97,44 @@ export class InputManager {
     // ── Mouse ──────────────────────────────────────────────────
     canvas.addEventListener('mousedown', (e) => {
       cb.initAudio();
+      const cx = toCanvasX(e.clientX);
+      const cy = toCanvasY(e.clientY);
       if (isShopOpen()) {
         shopWasOpen = true;
-        handleShopPointerDown(e.clientX, e.clientY);
-        handleShopTap(e.clientX, e.clientY);
+        handleShopPointerDown(cx, cy);
+        handleShopTap(cx, cy);
         return;
       }
       shopWasOpen = false;
       if (cb.state === GameState.START) { cb.onStartGame(); return; }
       if (cb.state === GameState.GAME_OVER) {
-        dragStartX = e.clientX;
-        dragStartY = e.clientY;
-        lastDragY = e.clientY;
+        dragStartX = cx;
+        dragStartY = cy;
+        lastDragY = cy;
         isDragging = false;
         return;
       }
-      cb.onTouchStart(e.clientX);
+      cb.onTouchStart(cx);
     });
 
     canvas.addEventListener('mousemove', (e) => {
-      if (isShopOpen()) { handleShopPointerMove(e.clientX, e.clientY); return; }
+      const cx = toCanvasX(e.clientX);
+      const cy = toCanvasY(e.clientY);
+      if (isShopOpen()) { handleShopPointerMove(cx, cy); return; }
       if (cb.state === GameState.GAME_OVER && e.buttons === 1) {
-        const totalDy = Math.abs(e.clientY - dragStartY);
+        const totalDy = Math.abs(cy - dragStartY);
         if (!isDragging && totalDy > DRAG_THRESHOLD) isDragging = true;
         if (isDragging) {
-          cb.onGameOverDrag(lastDragY - e.clientY);
-          lastDragY = e.clientY;
+          cb.onGameOverDrag(lastDragY - cy);
+          lastDragY = cy;
         }
         return;
       }
       if (cb.state !== GameState.PLAYING) return;
-      cb.onTouchMove(e.clientX);
+      cb.onTouchMove(cx);
     });
 
-    canvas.addEventListener('mouseup', () => {
+    canvas.addEventListener('mouseup', (e) => {
       if (shopWasOpen || isShopOpen()) { shopWasOpen = false; handleShopPointerUp(); return; }
       if (cb.state === GameState.GAME_OVER) {
         if (!isDragging) {

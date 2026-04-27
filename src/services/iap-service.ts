@@ -7,15 +7,21 @@
  * - 구매 상태는 localStorage + RevenueCat 서버로 동기화
  */
 
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { setAdsRemoved } from './ad-service';
 import type { IAPProduct } from '../types';
 
 // ── 플랫폼 감지 ──────────────────────────────────────────────
 const isNative = Capacitor.isNativePlatform();
 
-// ── RevenueCat API Key (플레이스홀더) ────────────────────────
-const REVENUECAT_API_KEY = 'YOUR_REVENUECAT_API_KEY';
+// ── Google Play Billing 네이티브 플러그인 ─────────────────────
+interface BillingPlugin {
+  getProducts(opts: { productIds: string[] }): Promise<{ products: Array<{ productId: string; name: string; description: string; price: string; priceMicros: number; currencyCode: string }> }>;
+  purchase(opts: { productId: string }): Promise<{ purchasedProducts: string[] }>;
+  restorePurchases(): Promise<{ purchasedProducts: string[] }>;
+}
+
+const Billing = registerPlugin<BillingPlugin>('Billing');
 
 // ── 상품 ID 상수 ─────────────────────────────────────────────
 export const PRODUCT_REMOVE_ADS = 'endlessjump_remove_ads';
@@ -70,16 +76,6 @@ const DEFAULT_PRODUCTS: IAPProduct[] = [
   },
 ];
 
-// ── IAP 플러그인 (추후 호환 플러그인 설치 시 활성화) ──────────
-let Purchases: any = null;
-
-async function loadPurchasesPlugin(): Promise<boolean> {
-  // @capgo/capacitor-purchases는 Capacitor 8 미지원으로 제거됨
-  // 호환 플러그인 설치 후 여기에 dynamic import 추가
-  console.log('[IAPService] IAP 플러그인 미설치 — 스텁 모드');
-  return false;
-}
-
 // ── 상태 ────────────────────────────────────────────────────
 let initialized = false;
 let purchasedProducts: Set<string> = new Set();
@@ -123,47 +119,19 @@ export async function initIAP(): Promise<void> {
     return;
   }
 
-  const loaded = await loadPurchasesPlugin();
-  if (!loaded || !Purchases) return;
-
   try {
-    await Purchases.configure({
-      apiKey: REVENUECAT_API_KEY,
-    });
-    initialized = true;
-    console.log('[IAPService] RevenueCat 초기화 완료');
-
-    // 서버에서 구매 상태 동기화
-    await syncPurchases();
-  } catch (e) {
-    console.warn('[IAPService] RevenueCat 초기화 실패:', e);
-  }
-}
-
-// ── 서버에서 구매 상태 동기화 ────────────────────────────────
-async function syncPurchases(): Promise<void> {
-  if (!initialized || !Purchases) return;
-
-  try {
-    const { customerInfo } = await Purchases.getCustomerInfo();
-    const entitlements = customerInfo?.entitlements?.active || {};
-
-    // 광고 제거
-    if (entitlements['remove_ads'] || entitlements[PRODUCT_REMOVE_ADS]) {
-      purchasedProducts.add(PRODUCT_REMOVE_ADS);
-      setAdsRemoved(true);
+    // Google Play에서 기존 구매 복원
+    const { purchasedProducts: restored } = await Billing.restorePurchases();
+    for (const pid of restored) {
+      purchasedProducts.add(pid);
+      if (pid === PRODUCT_REMOVE_ADS) setAdsRemoved(true);
     }
-
-    // 스킨 팩들
-    for (const skinId of ALL_SKIN_PRODUCTS) {
-      if (entitlements[skinId]) {
-        purchasedProducts.add(skinId);
-      }
-    }
-
     savePurchases();
+    initialized = true;
+    console.log('[IAPService] Google Play Billing 초기화 완료');
   } catch (e) {
-    console.warn('[IAPService] 구매 상태 동기화 실패:', e);
+    console.warn('[IAPService] Billing 초기화 실패:', e);
+    initialized = true; // 실패해도 구매 시도는 가능하게
   }
 }
 
@@ -174,30 +142,24 @@ export function getProducts(): IAPProduct[] {
 
 // ── 구매 처리 ───────────────────────────────────────────────
 export async function purchaseProduct(productId: string): Promise<boolean> {
-  if (!isNative || !initialized || !Purchases) {
+  if (!isNative || !initialized) {
     console.warn('[IAPService] IAP를 사용할 수 없는 환경입니다.');
     return false;
   }
 
   try {
-    const { customerInfo } = await Purchases.purchaseProduct({
-      productIdentifier: productId,
-    });
+    const { purchasedProducts: bought } = await Billing.purchase({ productId });
 
-    // 구매 성공 처리
-    purchasedProducts.add(productId);
-    savePurchases();
-
-    // 광고 제거 구매 시 즉시 반영
-    if (productId === PRODUCT_REMOVE_ADS) {
-      setAdsRemoved(true);
+    for (const pid of bought) {
+      purchasedProducts.add(pid);
+      if (pid === PRODUCT_REMOVE_ADS) setAdsRemoved(true);
     }
+    savePurchases();
 
     console.log(`[IAPService] 구매 완료: ${productId}`);
     return true;
   } catch (e: any) {
-    // 사용자가 취소한 경우
-    if (e?.code === 'PURCHASE_CANCELLED' || e?.userCancelled) {
+    if (e?.message?.includes('USER_CANCELED')) {
       console.log('[IAPService] 사용자가 구매를 취소했습니다.');
       return false;
     }
@@ -208,33 +170,24 @@ export async function purchaseProduct(productId: string): Promise<boolean> {
 
 // ── 구매 복원 ───────────────────────────────────────────────
 export async function restorePurchases(): Promise<boolean> {
-  if (!isNative || !initialized || !Purchases) {
+  if (!isNative || !initialized) {
     console.warn('[IAPService] IAP를 사용할 수 없는 환경입니다.');
     return false;
   }
 
   try {
-    const { customerInfo } = await Purchases.restorePurchases();
-    const entitlements = customerInfo?.entitlements?.active || {};
+    const { purchasedProducts: restored } = await Billing.restorePurchases();
 
-    let restored = false;
-
-    if (entitlements['remove_ads'] || entitlements[PRODUCT_REMOVE_ADS]) {
-      purchasedProducts.add(PRODUCT_REMOVE_ADS);
-      setAdsRemoved(true);
-      restored = true;
+    let hasNew = false;
+    for (const pid of restored) {
+      if (!purchasedProducts.has(pid)) hasNew = true;
+      purchasedProducts.add(pid);
+      if (pid === PRODUCT_REMOVE_ADS) setAdsRemoved(true);
     }
-
-    for (const skinId of ALL_SKIN_PRODUCTS) {
-      if (entitlements[skinId]) {
-        purchasedProducts.add(skinId);
-        restored = true;
-      }
-    }
-
     savePurchases();
-    console.log(`[IAPService] 구매 복원 완료 (복원됨: ${restored})`);
-    return restored;
+
+    console.log(`[IAPService] 구매 복원 완료 (복원됨: ${hasNew})`);
+    return hasNew;
   } catch (e) {
     console.warn('[IAPService] 구매 복원 실패:', e);
     return false;

@@ -561,10 +561,13 @@ export class Game {
       console.warn('[Game] 댓글 수집/점수 제출 실패:', e);
     });
 
-    // 프로필 모달은 fire-and-forget 병렬 실행
+    // 프로필 모달: 완료 후 캐시 무효화 + 랭킹 재로드 (닉네임 반영)
     if (!localStorage.getItem('bh_profile_set')) {
       localStorage.setItem('bh_profile_set', '1');
-      showProfileModal().catch((e) => {
+      showProfileModal().then(() => {
+        invalidateCache();
+        this.loadRankings();
+      }).catch((e) => {
         console.warn('[Game] 프로필 모달 표시 실패:', e);
       });
     }

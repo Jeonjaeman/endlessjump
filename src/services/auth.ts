@@ -1,5 +1,16 @@
 import { getSupabase } from './supabase';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { flushQueue } from './offline-queue';
+
+// ── 네이티브 Google Sign-In 플러그인 ─────────────────────────
+interface GoogleAuthPlugin {
+  signIn(opts: { webClientId: string }): Promise<{ idToken: string; email: string; displayName: string }>;
+}
+
+const GoogleAuth = registerPlugin<GoogleAuthPlugin>('GoogleAuth');
+
+// Google Cloud Console → Web Client ID (Supabase Google Provider에 설정한 것과 동일)
+const GOOGLE_WEB_CLIENT_ID = '1051100102015-ep4olnqgi0qbsu443nvti1fj5e1ckb3s.apps.googleusercontent.com';
 
 const LOCAL_UUID_KEY = 'bh_local_uuid';
 const PROFILE_KEY = 'bh_profile';
@@ -60,17 +71,23 @@ export async function initAuth(): Promise<string | null> {
       return supabaseUserId;
     }
 
-    // 이전에 Google 연결했으면 Google 로그인 시도
-    if (localStorage.getItem(LINKED_KEY) === '1') {
-      const { data, error } = await sb.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: window.location.origin },
-      });
-      if (!error && data) {
-        // OAuth redirect 진행 — 페이지 리로드 후 위의 getSession에서 세션 복원
-        return null;
+    // 이전에 Google 연결했으면 세션이 만료된 경우만 재로그인 시도
+    if (localStorage.getItem(LINKED_KEY) === '1' && Capacitor.isNativePlatform()) {
+      try {
+        const { idToken } = await GoogleAuth.signIn({ webClientId: GOOGLE_WEB_CLIENT_ID });
+        const { data: signInData, error: signInError } = await sb.auth.signInWithIdToken({
+          provider: 'google',
+          token: idToken,
+        });
+        if (!signInError && signInData.user) {
+          supabaseUserId = signInData.user.id;
+          await ensureProfile();
+          flushQueue();
+          return supabaseUserId;
+        }
+      } catch {
+        // 자동 로그인 실패 → 익명으로 폴백
       }
-      // Google 로그인 실패 시 익명으로 폴백
     }
 
     // Anonymous sign-in
@@ -96,14 +113,34 @@ export async function linkGoogleAccount(): Promise<boolean> {
   if (!sb) return false;
 
   try {
-    const { data, error } = await sb.auth.linkIdentity({
+    // 네이티브 Google Sign-In으로 ID 토큰 획득
+    if (!Capacitor.isNativePlatform()) {
+      // 웹 폴백: redirect 방식
+      const { data, error } = await sb.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin },
+      });
+      return !error && !!data;
+    }
+
+    const { idToken } = await GoogleAuth.signIn({ webClientId: GOOGLE_WEB_CLIENT_ID });
+
+    // Supabase에 ID 토큰으로 로그인
+    const { data, error } = await sb.auth.signInWithIdToken({
       provider: 'google',
-      options: { redirectTo: window.location.origin },
+      token: idToken,
     });
-    if (error || !data) return false;
-    // OAuth redirect 진행 — 복귀 후 initAuth의 getSession에서 linked 감지 + LINKED_KEY 설정
+
+    if (error || !data.user) return false;
+
+    supabaseUserId = data.user.id;
+    localStorage.setItem(LINKED_KEY, '1');
+    await ensureProfile();
+    flushQueue();
     return true;
-  } catch {
+  } catch (e: any) {
+    if (e?.message?.includes('USER_CANCELED')) return false;
+    console.warn('[Auth] Google 연결 실패:', e);
     return false;
   }
 }

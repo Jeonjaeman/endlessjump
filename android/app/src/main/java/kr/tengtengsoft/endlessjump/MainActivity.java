@@ -8,6 +8,8 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        registerPlugin(BillingPlugin.class);
+        registerPlugin(GoogleAuthPlugin.class);
         super.onCreate(savedInstanceState);
         hideSystemUI();
     }

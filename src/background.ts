@@ -20,7 +20,7 @@ const ZONE_THRESHOLDS = [5000, 12000, 22000, 35000];
 // 역방향 구간 폭
 const REVERSE_ZONE_SIZE = 10000;
 
-const FADE_DURATION = 120; // frames (~2 seconds at 60fps)
+const FADE_DURATION = 40; // frames (~0.67 seconds at 60fps)
 const DAY_CYCLE_MS = 120_000;
 
 function getZoneIndex(height: number): number {
