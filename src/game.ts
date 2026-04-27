@@ -573,7 +573,10 @@ export class Game {
   private async collectCommentThenSubmit(heightMm: number, score: number): Promise<void> {
     const skinId = getSelectedSkinId();
 
-    // 현재 기록이 TOP 10에 들 수 있는지 체크 (제출 전에 확인)
+    // 먼저 랭킹을 로드하여 현재 TOP 10 확인
+    await this.loadRankings();
+
+    // 현재 기록이 TOP 10에 들 수 있는지 체크
     const top10Heights = this.rankings.map(r => r.height);
     const wouldBeTop10 = top10Heights.length < 10 || heightMm > Math.min(...top10Heights);
 
