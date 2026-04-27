@@ -287,3 +287,9 @@ export function getSkinColors(skinId: string): SkinColors {
   const skin = ALL_SKINS.find(s => s.id === skinId);
   return skin ? skin.colors : DEFAULT_COLORS;
 }
+
+/** 스킨 ID로 body 색상 반환 (랭킹 표시용). 알 수 없는 ID는 기본 흰색 반환. */
+export function getSkinBodyColorById(skinId: string): string {
+  const skin = ALL_SKINS.find(s => s.id === skinId);
+  return skin ? skin.colors.body : DEFAULT_COLORS.body;
+}

@@ -3,7 +3,7 @@ import { AudioManager } from './audio';
 import { initAuth, getLocalUUID, isAccountLinked, linkGoogleAccount } from './services/auth';
 import { submitScore } from './services/score';
 import { fetchRanking, invalidateCache } from './services/leaderboard';
-import { renderRankingScreen, getTabHitArea, getReviveHitArea, getLinkHitArea } from './ui/ranking-screen';
+import { renderRankingScreen, getTabHitArea, getReviveHitArea, getLinkHitArea, getRankingMaxScroll } from './ui/ranking-screen';
 import { showProfileModal } from './ui/profile-modal';
 import { initAds, showBanner, hideBanner, showInterstitialOnGameOver, isRewardedReady, showRewardedAd, areAdsRemoved } from './services/ad-service';
 import { initIAP } from './services/iap-service';
@@ -97,6 +97,8 @@ export class Game {
   private rankings: RankEntry[] = [];
   private myRank: RankEntry | null = null;
   private rankingTab: 'all' | 'weekly' = 'all';
+  private rankingScrollY = 0;
+  private rankingMaxScroll = 0;
 
   // Ad / Revive state
   private hasUsedRevive = false;
@@ -131,6 +133,12 @@ export class Game {
         this.resetGame();
         this.state = GameState.START;
       },
+      onGameOverDrag: (dy: number) => {
+        this.rankingScrollY = Math.max(0, Math.min(this.rankingMaxScroll, this.rankingScrollY + dy));
+      },
+      onGameOverWheel: (dy: number) => {
+        this.rankingScrollY = Math.max(0, Math.min(this.rankingMaxScroll, this.rankingScrollY + dy * 0.5));
+      },
       onTouchStart: (x: number) => {
         this.touchX = x;
         this.touching = true;
@@ -162,6 +170,7 @@ export class Game {
         this.audio.suspend();
       } else {
         this.audio.resume();
+        this.lastTime = 0; // 복귀 시 dt 리셋 → 첫 프레임 렉 방지
       }
     });
     this.resetGame();
@@ -540,14 +549,16 @@ export class Game {
     this.rankings = [];
     this.myRank = null;
     this.rankingTab = 'all';
+    this.rankingScrollY = 0;
+    this.rankingMaxScroll = 0;
 
     // async 클로저 전에 값 캡처 (상태 변경에 의한 경합 방지)
     const capturedScore = this.score;
     const capturedHeightMm = Math.floor(this.heightReached);
 
-    // 점수 제출 + 랭킹 로드 먼저 실행 (스코어/랭킹 우선 표시)
-    this.submitAndLoadRankings(capturedHeightMm, capturedScore).catch((e) => {
-      console.warn('[Game] 점수 제출/랭킹 로드 실패:', e);
+    // 댓글 수집 후 점수 제출 + 랭킹 로드
+    this.collectCommentThenSubmit(capturedHeightMm, capturedScore).catch((e) => {
+      console.warn('[Game] 댓글 수집/점수 제출 실패:', e);
     });
 
     // 프로필 모달은 fire-and-forget 병렬 실행
@@ -559,8 +570,124 @@ export class Game {
     }
   }
 
-  private async submitAndLoadRankings(heightMm: number, score: number): Promise<void> {
-    await submitScore({ score, height: heightMm });
+  private async collectCommentThenSubmit(heightMm: number, score: number): Promise<void> {
+    const comment = await this.showCommentOverlay();
+    const skinId = getSelectedSkinId();
+    await this.submitAndLoadRankings(heightMm, score, skinId, comment);
+  }
+
+  private showCommentOverlay(): Promise<string> {
+    return new Promise((resolve) => {
+      // ── 최상위 overlay ─────────────────────────────────────
+      const overlay = document.createElement('div');
+      overlay.style.position = 'fixed';
+      overlay.style.inset = '0';
+      overlay.style.display = 'flex';
+      overlay.style.alignItems = 'center';
+      overlay.style.justifyContent = 'center';
+      overlay.style.zIndex = '9999';
+      overlay.style.background = 'rgba(0,0,0,0.75)';
+      overlay.style.padding = '20px';
+      overlay.style.boxSizing = 'border-box';
+
+      // ── 카드 ───────────────────────────────────────────────
+      const card = document.createElement('div');
+      card.style.background = 'rgba(30,30,50,0.97)';
+      card.style.border = '1px solid rgba(255,107,53,0.5)';
+      card.style.borderRadius = '16px';
+      card.style.padding = '24px 20px';
+      card.style.width = '100%';
+      card.style.maxWidth = '340px';
+      card.style.textAlign = 'center';
+      card.style.fontFamily = 'sans-serif';
+      card.style.color = '#fff';
+      card.style.boxSizing = 'border-box';
+
+      // ── 제목 ───────────────────────────────────────────────
+      const title = document.createElement('div');
+      title.style.fontSize = '22px';
+      title.style.fontWeight = 'bold';
+      title.style.color = '#FF4444';
+      title.style.marginBottom = '6px';
+      title.textContent = 'Game Over 🐰';
+
+      // ── 서브타이틀 ─────────────────────────────────────────
+      const sub = document.createElement('div');
+      sub.style.fontSize = '13px';
+      sub.style.color = 'rgba(255,255,255,0.6)';
+      sub.style.marginBottom = '16px';
+      sub.textContent = '이 기록 넘겨봐~ 한 마디 남기고 가!';
+
+      // ── textarea ───────────────────────────────────────────
+      const textarea = document.createElement('textarea');
+      textarea.maxLength = 100;
+      textarea.placeholder = '도발 한 마디 (선택, 최대 100자)';
+      textarea.style.width = '100%';
+      textarea.style.boxSizing = 'border-box';
+      textarea.style.background = 'rgba(255,255,255,0.08)';
+      textarea.style.border = '1px solid rgba(255,255,255,0.2)';
+      textarea.style.borderRadius = '10px';
+      textarea.style.color = '#fff';
+      textarea.style.fontSize = '14px';
+      textarea.style.padding = '10px 12px';
+      textarea.style.resize = 'none';
+      textarea.style.height = '70px';
+      textarea.style.outline = 'none';
+      textarea.style.fontFamily = 'sans-serif';
+
+      // ── 글자 수 카운터 ─────────────────────────────────────
+      const charCount = document.createElement('div');
+      charCount.style.fontSize = '11px';
+      charCount.style.color = 'rgba(255,255,255,0.35)';
+      charCount.style.textAlign = 'right';
+      charCount.style.marginTop = '4px';
+      charCount.textContent = '0 / 100';
+
+      // ── 확인 버튼 ──────────────────────────────────────────
+      const btn = document.createElement('button');
+      btn.style.marginTop = '14px';
+      btn.style.width = '100%';
+      btn.style.padding = '12px';
+      btn.style.background = 'rgba(255,107,53,0.8)';
+      btn.style.border = 'none';
+      btn.style.borderRadius = '10px';
+      btn.style.color = '#fff';
+      btn.style.fontSize = '16px';
+      btn.style.fontWeight = 'bold';
+      btn.style.cursor = 'pointer';
+      btn.textContent = '확인';
+
+      // ── 조립 ───────────────────────────────────────────────
+      card.appendChild(title);
+      card.appendChild(sub);
+      card.appendChild(textarea);
+      card.appendChild(charCount);
+      card.appendChild(btn);
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+
+      // ── 이벤트 ─────────────────────────────────────────────
+      textarea.addEventListener('input', () => {
+        charCount.textContent = `${textarea.value.length} / 100`;
+      });
+
+      const confirm = () => {
+        const value = textarea.value.trim();
+        document.body.removeChild(overlay);
+        resolve(value);
+      };
+
+      btn.addEventListener('click', confirm);
+      textarea.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) confirm();
+      });
+
+      setTimeout(() => textarea.focus(), 100);
+    });
+  }
+
+  private async submitAndLoadRankings(heightMm: number, score: number, skinId: string, comment: string): Promise<void> {
+    await submitScore({ score, height: heightMm, skin_id: skinId, comment: comment || undefined });
     invalidateCache(); // 점수 제출 후 캐시 무효화하여 최신 랭킹 반영
     await this.loadRankings();
   }
@@ -742,12 +869,14 @@ export class Game {
   }
 
   private renderGameOverScreen(ctx: CanvasRenderingContext2D): void {
+    this.rankingMaxScroll = getRankingMaxScroll(this.rankings, this.myRank);
     renderRankingScreen(
       ctx, this.w, this.h,
       this.rankings, this.myRank, this.rankingTab,
       this.score, Math.floor(this.heightReached),
       this.bestScore, this.bestHeight,
       this.reviveAvailable,
+      this.rankingScrollY,
     );
   }
 }

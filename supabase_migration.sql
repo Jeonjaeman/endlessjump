@@ -133,3 +133,75 @@ CREATE POLICY "Users can update own scores" ON scores
 
 -- 9. Verify function works (test call)
 -- SELECT * FROM get_ranking('00000000-0000-0000-0000-000000000000', 'all') LIMIT 5;
+
+-- ================================================================
+-- Migration: Add comment and skin_id to scores
+-- Run in Supabase SQL Editor after initial migration
+-- ================================================================
+
+ALTER TABLE scores
+  ADD COLUMN IF NOT EXISTS comment TEXT CHECK (char_length(comment) <= 100),
+  ADD COLUMN IF NOT EXISTS skin_id TEXT DEFAULT 'default';
+
+DROP FUNCTION IF EXISTS get_ranking(uuid, text);
+
+CREATE OR REPLACE FUNCTION get_ranking(
+  p_user_id UUID,
+  p_mode TEXT
+)
+RETURNS TABLE (
+  rank BIGINT,
+  score INTEGER,
+  height INTEGER,
+  nickname TEXT,
+  country_code TEXT,
+  user_id UUID,
+  is_me BOOLEAN,
+  comment TEXT,
+  skin_id TEXT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF p_mode = 'weekly' THEN
+    RETURN QUERY
+    WITH ranked AS (
+      SELECT
+        s.user_id,
+        s.score,
+        s.height,
+        p.nickname,
+        p.country_code,
+        s.comment,
+        s.skin_id,
+        ROW_NUMBER() OVER (ORDER BY s.height DESC, s.score DESC, s.created_at ASC) AS rank
+      FROM scores s
+      JOIN profiles p ON p.id = s.user_id
+      WHERE s.played_at >= NOW() - INTERVAL '7 days'
+    )
+    SELECT r.rank, r.score, r.height, r.nickname, r.country_code,
+           r.user_id, (r.user_id = p_user_id) AS is_me, r.comment, r.skin_id
+    FROM ranked r ORDER BY r.rank;
+  ELSE
+    RETURN QUERY
+    WITH ranked AS (
+      SELECT
+        s.user_id,
+        s.score,
+        s.height,
+        p.nickname,
+        p.country_code,
+        s.comment,
+        s.skin_id,
+        ROW_NUMBER() OVER (ORDER BY s.height DESC, s.score DESC, s.created_at ASC) AS rank
+      FROM scores s
+      JOIN profiles p ON p.id = s.user_id
+    )
+    SELECT r.rank, r.score, r.height, r.nickname, r.country_code,
+           r.user_id, (r.user_id = p_user_id) AS is_me, r.comment, r.skin_id
+    FROM ranked r ORDER BY r.rank;
+  END IF;
+END;
+$$;

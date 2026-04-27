@@ -43,6 +43,8 @@ export async function fetchRanking(mode: 'all' | 'weekly'): Promise<RankEntry[]>
       nickname: string;
       country_code: string;
       user_id: string;
+      comment: string | null;
+      skin_id: string | null;
     }>).map(row => ({
       rank: row.rank,
       score: row.score,
@@ -50,6 +52,8 @@ export async function fetchRanking(mode: 'all' | 'weekly'): Promise<RankEntry[]>
       nickname: row.nickname,
       country_code: row.country_code,
       is_me: row.user_id === userId,
+      comment: row.comment ?? undefined,
+      skin_id: row.skin_id ?? undefined,
     }));
 
     cache[cacheKey] = { data: entries, timestamp: Date.now() };

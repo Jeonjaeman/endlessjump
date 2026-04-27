@@ -5,6 +5,8 @@ import { enqueueScore, flushQueue } from './offline-queue';
 export interface ScoreData {
   score: number;
   height: number;
+  skin_id?: string;
+  comment?: string;
 }
 
 export async function submitScore(data: ScoreData): Promise<boolean> {
@@ -21,6 +23,8 @@ export async function submitScore(data: ScoreData): Promise<boolean> {
       user_id: userId,
       score: data.score,
       height: data.height,
+      skin_id: data.skin_id ?? 'default',
+      comment: data.comment ?? null,
     });
 
     if (error) {
@@ -28,7 +32,6 @@ export async function submitScore(data: ScoreData): Promise<boolean> {
       return false;
     }
 
-    // Try flushing any queued scores too
     flushQueue();
     return true;
   } catch {

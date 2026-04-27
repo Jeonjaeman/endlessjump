@@ -53,6 +53,8 @@ export interface RankEntry {
   nickname: string;
   country_code: string;
   is_me: boolean;
+  comment?: string;
+  skin_id?: string;
 }
 
 // -- Phase 5: IAP / Skin / Achievement --
