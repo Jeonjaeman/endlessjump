@@ -133,7 +133,7 @@ function createModal(profile: LocalProfile): void {
 
     const newProfile: LocalProfile = { nickname, country_code: selectedCode };
     saveLocalProfile(newProfile);
-    updateProfile(newProfile);
+    await updateProfile(newProfile);
     closeModal(newProfile);
   });
   box.appendChild(saveBtn);

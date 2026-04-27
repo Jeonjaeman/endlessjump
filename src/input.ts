@@ -23,6 +23,7 @@ export class InputManager {
     let isDragging = false;
     let lastDragY = 0;
     let shopWasOpen = false;
+    let lastTouchTime = 0; // 터치 후 마우스 이벤트 무시용
 
     // clientX/clientY → 캔버스 상대 좌표 변환
     const toCanvasX = (clientX: number) => {
@@ -37,6 +38,7 @@ export class InputManager {
     // ── Touch ──────────────────────────────────────────────────
     canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
+      lastTouchTime = Date.now();
       cb.initAudio();
       const t = e.touches[0];
       const cx = toCanvasX(t.clientX);
@@ -96,6 +98,7 @@ export class InputManager {
 
     // ── Mouse ──────────────────────────────────────────────────
     canvas.addEventListener('mousedown', (e) => {
+      if (Date.now() - lastTouchTime < 500) return; // 터치 직후 마우스 이벤트 무시
       cb.initAudio();
       const cx = toCanvasX(e.clientX);
       const cy = toCanvasY(e.clientY);
@@ -118,6 +121,7 @@ export class InputManager {
     });
 
     canvas.addEventListener('mousemove', (e) => {
+      if (Date.now() - lastTouchTime < 500) return;
       const cx = toCanvasX(e.clientX);
       const cy = toCanvasY(e.clientY);
       if (isShopOpen()) { handleShopPointerMove(cx, cy); return; }
@@ -135,6 +139,7 @@ export class InputManager {
     });
 
     canvas.addEventListener('mouseup', (e) => {
+      if (Date.now() - lastTouchTime < 500) return;
       if (shopWasOpen || isShopOpen()) { shopWasOpen = false; handleShopPointerUp(); return; }
       if (cb.state === GameState.GAME_OVER) {
         if (!isDragging) {
