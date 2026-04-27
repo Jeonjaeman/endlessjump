@@ -10,6 +10,16 @@
 npm run build    # TypeScript 컴파일 + Vite 번들
 npm run dev      # 개발 서버
 npx cap sync     # Android 동기화
+
+# Android APK 빌드 (JDK 21 필수 — JDK 25는 Gradle 8.x 미지원)
+JAVA_HOME="/c/Program Files/Java/jdk-21.0.10" ./gradlew assembleDebug
+```
+
+## 의존성 설치 주의사항
+
+```bash
+# @capgo/capacitor-purchases가 Capacitor 5 peer dep → legacy-peer-deps 필요
+npm install --legacy-peer-deps
 ```
 
 ## 커밋 규칙

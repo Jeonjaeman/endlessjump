@@ -33,3 +33,19 @@ android/capacitor-cordova-android-plugins/build
 android/capacitor-android/build
 android/local.properties
 *.apk
+*.keystore
+*.jks
+
+# Python
+__pycache__/
+*.pyc
+
+# Claude Code / agent state
+.claude/
+.omc/
+.superpowers/
+android/.omc/
+
+# Local notes / scratch
+fix_instruction.md
+
