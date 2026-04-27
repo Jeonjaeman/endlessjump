@@ -4,62 +4,49 @@ import { isAccountLinked } from '../services/auth';
 import { getSkinBodyColorById } from '../services/skin-service';
 
 const MEDAL_EMOJIS = ['\u{1F451}', '\u{1F948}', '\u{1F949}'];
-const MEDAL_GLOWS = [
-  { bg: 'rgba(255,215,0,0.2)', border: 'rgba(255,215,0,0.6)', text: '#FFD700' },
-  { bg: 'rgba(192,192,192,0.15)', border: 'rgba(200,200,220,0.5)', text: '#E0E0F0' },
-  { bg: 'rgba(205,127,50,0.15)', border: 'rgba(205,160,80,0.5)', text: '#E8B060' },
-];
+const MEDAL_BG = ['#FFD700', '#D0D0E0', '#E8A860'];
+const MEDAL_SHADOW = ['#CC9900', '#8888AA', '#B07030'];
 
-const ROW_H = 36;
-const COMMENT_H = 18;
-const ROW_GAP = 4;
-const LIST_CLIP_H = 280;
+const ROW_H = 34;
+const COMMENT_H = 16;
+const ROW_GAP = 6;
+const LIST_CLIP_H = 290;
 
-export function getRankingMaxScroll(rankings: RankEntry[], myRank: RankEntry | null): number {
-  const rows = Math.min(rankings.filter(r => r.rank <= 10).length, 10);
-  const hasMyRank = myRank !== null && myRank.rank > 10;
-  const rowH = ROW_H + COMMENT_H + ROW_GAP;
-  const totalH = rows * rowH + (hasMyRank ? rowH + 20 : 0);
-  return Math.max(0, totalH - LIST_CLIP_H);
-}
+// ── Neobrutalism 유틸 ──────────────────────────────────────────
 
-// ── 글라스모피즘 유틸 ──────────────────────────────────────────
-
-function drawGlassRect(
+function drawNeoRect(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, w: number, h: number, r: number,
-  bgColor: string, borderColor: string,
+  bgColor: string, shadowOffset: number = 3,
 ): void {
+  // 오프셋 그림자
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  roundRect(ctx, x + shadowOffset, y + shadowOffset, w, h, r);
+  ctx.fill();
+
+  // 배경
   ctx.fillStyle = bgColor;
   ctx.beginPath();
   roundRect(ctx, x, y, w, h, r);
   ctx.fill();
 
-  const hlGrad = ctx.createLinearGradient(x, y, x, y + h * 0.5);
-  hlGrad.addColorStop(0, 'rgba(255,255,255,0.15)');
-  hlGrad.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = hlGrad;
-  ctx.beginPath();
-  roundRect(ctx, x, y, w, h * 0.5, r);
-  ctx.fill();
-
-  ctx.strokeStyle = borderColor;
-  ctx.lineWidth = 1;
+  // 굵은 테두리
+  ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+  ctx.lineWidth = 2;
   ctx.beginPath();
   roundRect(ctx, x, y, w, h, r);
   ctx.stroke();
 }
 
-function drawGlassButton(
+function drawNeoButton(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, w: number, h: number,
   label: string, active: boolean,
-  accentColor: string = 'rgba(255,107,53,0.6)',
+  activeBg: string = '#FF6B35', inactiveBg: string = 'rgba(60,60,80,0.9)',
 ): void {
-  const bg = active ? accentColor : 'rgba(255,255,255,0.08)';
-  const border = active ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)';
-  drawGlassRect(ctx, x, y, w, h, 10, bg, border);
-  ctx.fillStyle = active ? '#FFF' : 'rgba(255,255,255,0.7)';
+  drawNeoRect(ctx, x, y, w, h, 8, active ? activeBg : inactiveBg, active ? 3 : 2);
+  ctx.fillStyle = '#FFF';
   ctx.font = active ? 'bold 14px sans-serif' : '14px sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText(label, x + w / 2, y + h / 2 + 5);
@@ -75,9 +62,30 @@ function drawSkinDot(
   ctx.arc(cx, cy, radius, 0, Math.PI * 2);
   ctx.fillStyle = color;
   ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+  ctx.lineWidth = 1.5;
   ctx.stroke();
+}
+
+// ── 랭킹 TOP 10 진입 여부 체크 (댓글 팝업용) ───────────────────
+
+export function isInTop10(rankings: RankEntry[], myRank: RankEntry | null): boolean {
+  if (myRank && myRank.rank <= 10) return true;
+  return rankings.some(r => r.is_me && r.rank <= 10);
+}
+
+// ── 스크롤 계산 ──────────────────────────────────────────────────
+
+function getRowHeight(entry: RankEntry): number {
+  return ROW_H + (entry.comment ? COMMENT_H : 0) + ROW_GAP;
+}
+
+export function getRankingMaxScroll(rankings: RankEntry[], myRank: RankEntry | null): number {
+  const top10 = rankings.filter(r => r.rank <= 10);
+  let totalH = 0;
+  for (const e of top10) totalH += getRowHeight(e);
+  if (myRank && myRank.rank > 10) totalH += getRowHeight(myRank) + 20;
+  return Math.max(0, totalH - LIST_CLIP_H);
 }
 
 // ── 메인 렌더링 ────────────────────────────────────────────────
@@ -96,8 +104,7 @@ export function renderRankingScreen(
   reviveAvailable: boolean = false,
   scrollY: number = 0,
 ): void {
-  // Dark overlay
-  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillStyle = 'rgba(0,0,0,0.65)';
   ctx.fillRect(0, 0, w, h);
 
   const cx = w / 2;
@@ -105,14 +112,13 @@ export function renderRankingScreen(
   const contentH = 500;
   const startY = Math.max(safeTop, (h - contentH) / 2);
 
-  // Game Over title
-  ctx.fillStyle = '#FF4444';
-  ctx.font = 'bold 28px sans-serif';
+  // Game Over title (Neobrutalism: bold, offset shadow text)
   ctx.textAlign = 'center';
-  ctx.shadowColor = 'rgba(255,50,50,0.4)';
-  ctx.shadowBlur = 12;
+  ctx.font = 'bold 30px sans-serif';
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fillText('Game Over!', cx + 2, startY + 32);
+  ctx.fillStyle = '#FF4444';
   ctx.fillText('Game Over!', cx, startY + 30);
-  ctx.shadowBlur = 0;
 
   // Current height
   ctx.fillStyle = '#FFF';
@@ -123,18 +129,17 @@ export function renderRankingScreen(
   ctx.font = '14px sans-serif';
   ctx.fillText(`Carrots: ${score}`, cx, startY + 86);
 
-  // Best record
   ctx.fillStyle = '#FFD700';
   ctx.font = '13px sans-serif';
   ctx.fillText(`Best: ${bestHeight}mm / ${bestScore} carrots`, cx, startY + 106);
 
-  // Tab buttons
+  // Tab buttons (Neobrutalism)
   const tabY = startY + 120;
   const tabW = 90;
   const tabH = 30;
   const tabGap = 10;
-  drawGlassButton(ctx, cx - tabW - tabGap / 2, tabY, tabW, tabH, '전체', activeTab === 'all');
-  drawGlassButton(ctx, cx + tabGap / 2, tabY, tabW, tabH, '주간', activeTab === 'weekly');
+  drawNeoButton(ctx, cx - tabW - tabGap / 2, tabY, tabW, tabH, '\uC804\uCCB4', activeTab === 'all');
+  drawNeoButton(ctx, cx + tabGap / 2, tabY, tabW, tabH, '\uC8FC\uAC04', activeTab === 'weekly');
 
   // Ranking list
   const listY = tabY + tabH + 14;
@@ -142,8 +147,8 @@ export function renderRankingScreen(
   const listX = (w - listW) / 2;
 
   // Header
-  ctx.fillStyle = 'rgba(255,255,255,0.3)';
-  ctx.font = 'bold 12px sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'left';
   ctx.fillText('#', listX + 8, listY);
   ctx.fillText('Player', listX + 54, listY);
@@ -151,154 +156,160 @@ export function renderRankingScreen(
   ctx.fillText('Height', listX + listW - 8, listY);
 
   const top10 = rankings.filter(r => r.rank <= 10);
-  const rowH = ROW_H + COMMENT_H + ROW_GAP;
 
-  // 클립 영역으로 스크롤 마스크
+  // 클립 영역
   ctx.save();
   ctx.beginPath();
-  ctx.rect(listX - 4, listY + 2, listW + 8, LIST_CLIP_H + 8);
+  ctx.rect(listX - 6, listY + 2, listW + 12, LIST_CLIP_H);
   ctx.clip();
   ctx.translate(0, -scrollY);
 
+  let curY = listY + 14;
+
   for (let i = 0; i < top10.length; i++) {
     const entry = top10[i];
-    const ry = listY + 14 + i * rowH;
     const isTop3 = entry.rank >= 1 && entry.rank <= 3;
     const medalIdx = entry.rank - 1;
-    const rowBoxH = ROW_H + (entry.comment ? COMMENT_H : 0);
+    const hasComment = !!entry.comment;
+    const thisRowH = ROW_H + (hasComment ? COMMENT_H : 0);
 
     if (isTop3) {
-      const glow = MEDAL_GLOWS[medalIdx];
-      drawGlassRect(ctx, listX, ry - 8, listW, rowBoxH + 2, 10, glow.bg, glow.border);
+      // TOP 3: Neobrutalism medal card
+      drawNeoRect(ctx, listX, curY - 6, listW, thisRowH + 4, 8, MEDAL_BG[medalIdx], 3);
 
-      ctx.font = '16px sans-serif';
+      // 메달 이모지
+      ctx.font = '14px sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(MEDAL_EMOJIS[medalIdx], listX + 6, ry + 13);
+      ctx.fillText(MEDAL_EMOJIS[medalIdx], listX + 8, curY + 12);
 
-      drawSkinDot(ctx, listX + 28, ry + 9, 7, entry.skin_id);
+      // 스킨 닷
+      drawSkinDot(ctx, listX + 34, curY + 8, 6, entry.skin_id);
 
-      ctx.font = 'bold 14px sans-serif';
-      ctx.fillStyle = entry.is_me ? '#FF6B35' : glow.text;
+      // 닉네임 (간격 넓힘)
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillStyle = entry.is_me ? '#FF6B35' : '#1a1a2e';
       const flag = getFlagEmoji(entry.country_code);
-      ctx.fillText(`${flag} ${entry.nickname}`, listX + 40, ry + 13);
+      ctx.fillText(`${flag} ${entry.nickname}`, listX + 46, curY + 12);
 
+      // 높이
       ctx.textAlign = 'right';
-      ctx.fillStyle = glow.text;
-      ctx.font = 'bold 14px sans-serif';
-      ctx.fillText(`${entry.height}mm`, listX + listW - 10, ry + 13);
+      ctx.fillStyle = '#1a1a2e';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText(`${entry.height}mm`, listX + listW - 10, curY + 12);
 
-      if (entry.comment) {
+      // 댓글
+      if (hasComment) {
         ctx.textAlign = 'left';
-        ctx.fillStyle = 'rgba(255,255,255,0.55)';
-        ctx.font = 'italic 11px sans-serif';
-        const truncated = entry.comment.length > 38 ? entry.comment.slice(0, 38) + '\u2026' : entry.comment;
-        ctx.fillText('\uD83D\uDCAC ' + truncated, listX + 10, ry + ROW_H + 4);
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.font = 'italic 10px sans-serif';
+        const truncated = entry.comment!.length > 36 ? entry.comment!.slice(0, 36) + '\u2026' : entry.comment!;
+        ctx.fillText('\uD83D\uDCAC ' + truncated, listX + 10, curY + ROW_H + 2);
       }
 
     } else {
+      // 4위 이하
       if (entry.is_me) {
-        drawGlassRect(ctx, listX, ry - 8, listW, rowBoxH + 2, 8,
-          'rgba(255,107,53,0.15)', 'rgba(255,107,53,0.5)');
+        drawNeoRect(ctx, listX, curY - 6, listW, thisRowH + 4, 6, 'rgba(255,107,53,0.85)', 2);
       }
 
       ctx.textAlign = 'left';
-      ctx.fillStyle = 'rgba(255,255,255,0.5)';
-      ctx.font = '13px sans-serif';
-      ctx.fillText(`${entry.rank}`, listX + 6, ry + 12);
+      ctx.fillStyle = entry.is_me ? '#FFF' : 'rgba(255,255,255,0.5)';
+      ctx.font = '12px sans-serif';
+      ctx.fillText(`${entry.rank}`, listX + 8, curY + 11);
 
-      drawSkinDot(ctx, listX + 36, ry + 8, 6, entry.skin_id);
+      drawSkinDot(ctx, listX + 34, curY + 7, 5, entry.skin_id);
 
-      ctx.font = '13px sans-serif';
-      ctx.fillStyle = entry.is_me ? '#FF6B35' : '#FFF';
+      ctx.font = '12px sans-serif';
+      ctx.fillStyle = entry.is_me ? '#FFF' : 'rgba(255,255,255,0.9)';
       const flag = getFlagEmoji(entry.country_code);
-      ctx.fillText(`${flag} ${entry.nickname}`, listX + 48, ry + 12);
+      ctx.fillText(`${flag} ${entry.nickname}`, listX + 46, curY + 11);
 
       ctx.textAlign = 'right';
       ctx.fillStyle = entry.is_me ? '#FFD700' : 'rgba(255,255,255,0.7)';
-      ctx.font = '13px sans-serif';
-      ctx.fillText(`${entry.height}mm`, listX + listW - 10, ry + 12);
+      ctx.font = '12px sans-serif';
+      ctx.fillText(`${entry.height}mm`, listX + listW - 10, curY + 11);
 
-      if (entry.comment) {
+      if (hasComment) {
         ctx.textAlign = 'left';
         ctx.fillStyle = 'rgba(255,255,255,0.45)';
-        ctx.font = 'italic 11px sans-serif';
-        const truncated = entry.comment.length > 38 ? entry.comment.slice(0, 38) + '\u2026' : entry.comment;
-        ctx.fillText('\uD83D\uDCAC ' + truncated, listX + 10, ry + ROW_H + 2);
+        ctx.font = 'italic 10px sans-serif';
+        const truncated = entry.comment!.length > 36 ? entry.comment!.slice(0, 36) + '\u2026' : entry.comment!;
+        ctx.fillText('\uD83D\uDCAC ' + truncated, listX + 10, curY + ROW_H);
       }
     }
+
+    curY += thisRowH + ROW_GAP;
   }
 
   // My rank if outside top 10
   if (myRank && myRank.rank > 10) {
-    const myY = listY + 14 + top10.length * rowH + 8;
+    curY += 8;
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillRect(listX, curY - 4, listW, 1);
+    curY += 8;
 
-    ctx.fillStyle = 'rgba(255,255,255,0.1)';
-    ctx.fillRect(listX, myY - 4, listW, 1);
+    const hasComment = !!myRank.comment;
+    const thisRowH = ROW_H + (hasComment ? COMMENT_H : 0);
 
-    const myRowY = myY + 12;
-    const myRowBoxH = ROW_H + (myRank.comment ? COMMENT_H : 0);
-    drawGlassRect(ctx, listX, myRowY - 8, listW, myRowBoxH + 2, 8,
-      'rgba(255,107,53,0.15)', 'rgba(255,107,53,0.5)');
+    drawNeoRect(ctx, listX, curY - 6, listW, thisRowH + 4, 6, 'rgba(255,107,53,0.85)', 2);
 
     ctx.textAlign = 'left';
-    ctx.fillStyle = '#FF6B35';
-    ctx.font = 'bold 14px sans-serif';
-    ctx.fillText(`${myRank.rank}`, listX + 6, myRowY + 12);
+    ctx.fillStyle = '#FFF';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.fillText(`${myRank.rank}`, listX + 8, curY + 11);
 
-    drawSkinDot(ctx, listX + 36, myRowY + 8, 6, myRank.skin_id);
+    drawSkinDot(ctx, listX + 34, curY + 7, 5, myRank.skin_id);
 
     const flag = getFlagEmoji(myRank.country_code);
-    ctx.fillText(`${flag} ${myRank.nickname}`, listX + 48, myRowY + 12);
+    ctx.fillText(`${flag} ${myRank.nickname}`, listX + 46, curY + 11);
 
     ctx.textAlign = 'right';
     ctx.fillStyle = '#FFD700';
-    ctx.fillText(`${myRank.height}mm`, listX + listW - 10, myRowY + 12);
+    ctx.fillText(`${myRank.height}mm`, listX + listW - 10, curY + 11);
 
-    if (myRank.comment) {
+    if (hasComment) {
       ctx.textAlign = 'left';
       ctx.fillStyle = 'rgba(255,255,255,0.55)';
-      ctx.font = 'italic 11px sans-serif';
-      const truncated = myRank.comment.length > 38 ? myRank.comment.slice(0, 38) + '\u2026' : myRank.comment;
-      ctx.fillText('\uD83D\uDCAC ' + truncated, listX + 10, myRowY + ROW_H + 2);
+      ctx.font = 'italic 10px sans-serif';
+      const truncated = myRank.comment!.length > 36 ? myRank.comment!.slice(0, 36) + '\u2026' : myRank.comment!;
+      ctx.fillText('\uD83D\uDCAC ' + truncated, listX + 10, curY + ROW_H);
     }
   }
 
-  ctx.restore(); // clip 해제
+  ctx.restore();
 
-  // 스크롤 인디케이터
+  // 스크롤 힌트
   if (getRankingMaxScroll(rankings, myRank) > 0) {
-    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('\u25BC \uC2A4\uD06C\uB864', cx, listY + LIST_CLIP_H + 14);
+    ctx.fillText('\u25BC \uC2A4\uD06C\uB864', cx, listY + LIST_CLIP_H + 12);
   }
 
-  // Revive button
+  // Revive button (Neobrutalism)
   if (reviveAvailable) {
     const btnW = 220;
     const btnH = 44;
     const btnX = cx - btnW / 2;
     const btnY = h - 90;
-    drawGlassRect(ctx, btnX, btnY, btnW, btnH, 12,
-      'rgba(76,175,80,0.4)', 'rgba(130,220,130,0.5)');
+    drawNeoRect(ctx, btnX, btnY, btnW, btnH, 10, '#4CAF50', 3);
     ctx.fillStyle = '#FFF';
-    ctx.font = 'bold 16px sans-serif';
+    ctx.font = 'bold 15px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('🎬 광고 보고 이어하기', cx, btnY + btnH / 2 + 6);
+    ctx.fillText('\uD83C\uDFAC \uAD11\uACE0 \uBCF4\uACE0 \uC774\uC5B4\uD558\uAE30', cx, btnY + btnH / 2 + 5);
   }
 
-  // Google 연결 배너
+  // Google 연결 배너 (Neobrutalism)
   if (!isAccountLinked()) {
     const linkBtnW = 240;
     const linkBtnH = 36;
     const linkBtnX = cx - linkBtnW / 2;
     const linkBtnY = reviveAvailable ? h - 145 : h - 90;
-    drawGlassRect(ctx, linkBtnX, linkBtnY, linkBtnW, linkBtnH, 10,
-      'rgba(66,133,244,0.35)', 'rgba(100,160,255,0.5)');
+    drawNeoRect(ctx, linkBtnX, linkBtnY, linkBtnW, linkBtnH, 8, '#4285F4', 3);
     ctx.fillStyle = '#FFF';
     ctx.font = 'bold 13px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('G  Google로 기록 영구 저장', cx, linkBtnY + linkBtnH / 2 + 5);
+    ctx.fillText('G  Google\uB85C \uAE30\uB85D \uC601\uAD6C \uC800\uC7A5', cx, linkBtnY + linkBtnH / 2 + 5);
   }
 
   // Tap to restart

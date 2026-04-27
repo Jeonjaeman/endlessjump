@@ -166,25 +166,19 @@ export function renderShop(ctx: CanvasRenderingContext2D, w: number, h: number):
   const panelX = (w - panelW) / 2;
   const panelY = (h - panelH) / 2;
 
-  // 패널 배경 (글라스모피즘)
-  ctx.fillStyle = 'rgba(20,20,40,0.85)';
+  // 패널 배경 (Neobrutalism)
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
   ctx.beginPath();
-  roundRect(ctx, panelX, panelY, panelW, panelH, 16);
+  roundRect(ctx, panelX + 4, panelY + 4, panelW, panelH, 14);
   ctx.fill();
-
-  // 상단 하이라이트
-  const panelHL = ctx.createLinearGradient(panelX, panelY, panelX, panelY + panelH * 0.3);
-  panelHL.addColorStop(0, 'rgba(255,255,255,0.1)');
-  panelHL.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = panelHL;
+  ctx.fillStyle = '#1e1e32';
   ctx.beginPath();
-  roundRect(ctx, panelX, panelY, panelW, panelH * 0.3, 16);
+  roundRect(ctx, panelX, panelY, panelW, panelH, 14);
   ctx.fill();
-
-  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+  ctx.lineWidth = 2.5;
   ctx.beginPath();
-  roundRect(ctx, panelX, panelY, panelW, panelH, 16);
+  roundRect(ctx, panelX, panelY, panelW, panelH, 14);
   ctx.stroke();
 
   // 제목
@@ -224,31 +218,23 @@ export function renderShop(ctx: CanvasRenderingContext2D, w: number, h: number):
     const tx = panelX + 10 + i * (tabW + 5);
     const active = shopTab === tab.key;
 
-    // 글라스모피즘 탭
-    const bg = active ? 'rgba(255,107,53,0.5)' : 'rgba(255,255,255,0.06)';
-    const border = active ? 'rgba(255,180,130,0.5)' : 'rgba(255,255,255,0.12)';
+    // Neobrutalism 탭
+    const bg = active ? '#FF6B35' : '#2a2a44';
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.beginPath();
+    roundRect(ctx, tx + 2, tabY + 2, tabW, tabH, 8);
+    ctx.fill();
     ctx.fillStyle = bg;
     ctx.beginPath();
     roundRect(ctx, tx, tabY, tabW, tabH, 8);
     ctx.fill();
-
-    if (active) {
-      const hlG = ctx.createLinearGradient(tx, tabY, tx, tabY + tabH * 0.5);
-      hlG.addColorStop(0, 'rgba(255,255,255,0.2)');
-      hlG.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.fillStyle = hlG;
-      ctx.beginPath();
-      roundRect(ctx, tx, tabY, tabW, tabH * 0.5, 8);
-      ctx.fill();
-    }
-
-    ctx.strokeStyle = border;
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.lineWidth = 2;
     ctx.beginPath();
     roundRect(ctx, tx, tabY, tabW, tabH, 8);
     ctx.stroke();
 
-    ctx.fillStyle = active ? '#FFF' : 'rgba(255,255,255,0.6)';
+    ctx.fillStyle = '#FFF';
     ctx.font = active ? 'bold 13px sans-serif' : '13px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(tab.label, tx + tabW / 2, tabY + tabH / 2 + 5);
@@ -365,27 +351,20 @@ function renderSkinsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
     const unlockInfo = getSkinUnlockInfo(skin.id);
     const spriteSet = skin.spriteDir ? skinAssetLoader.getSprites(skin.id) : null;
 
-    // 행 배경 (글라스모피즘)
-    const rowBg = isSelected ? 'rgba(255,107,53,0.18)' : 'rgba(255,255,255,0.05)';
-    const rowBorder = isSelected ? 'rgba(255,160,100,0.5)' : 'rgba(255,255,255,0.08)';
+    // 행 배경 (Neobrutalism)
+    const rowBg = isSelected ? '#FF6B35' : '#252540';
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.beginPath();
+    roundRect(ctx, x + 2, ry + 2, w, rowH, 8);
+    ctx.fill();
     ctx.fillStyle = rowBg;
     ctx.beginPath();
-    roundRect(ctx, x, ry, w, rowH, 10);
+    roundRect(ctx, x, ry, w, rowH, 8);
     ctx.fill();
-
-    // 상단 하이라이트
-    const rowHL = ctx.createLinearGradient(x, ry, x, ry + rowH * 0.4);
-    rowHL.addColorStop(0, 'rgba(255,255,255,0.06)');
-    rowHL.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = rowHL;
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    roundRect(ctx, x, ry, w, rowH * 0.4, 10);
-    ctx.fill();
-
-    ctx.strokeStyle = rowBorder;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    roundRect(ctx, x, ry, w, rowH, 10);
+    roundRect(ctx, x, ry, w, rowH, 8);
     ctx.stroke();
 
     // 스킨 프리뷰 (48x48)
@@ -443,9 +422,9 @@ function renderSkinsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
 
       const btnY = ry + (rowH - btnH) / 2;
       if (isSelected) {
-        drawGlassBtn(ctx, btnX, btnY, btnW, btnH, '선택됨', 'rgba(255,107,53,0.5)', 'rgba(255,180,130,0.5)');
+        drawNeoBtn(ctx, btnX, btnY, btnW, btnH, '선택됨', '#FF6B35');
       } else {
-        drawGlassBtn(ctx, btnX, btnY, btnW, btnH, '선택', 'rgba(255,255,255,0.08)', 'rgba(255,255,255,0.15)');
+        drawNeoBtn(ctx, btnX, btnY, btnW, btnH, '선택', '#3a3a55');
         itemButtonAreas.push({ id: skin.id, area: { x: btnX, y: btnY, width: btnW, height: btnH } });
       }
 
@@ -458,7 +437,7 @@ function renderSkinsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
 
       const btnY = ry + (rowH - btnH) / 2;
       const priceText = skin.price >= 1000 ? `₩${(skin.price / 1000).toFixed(1)}K` : `₩${skin.price.toLocaleString()}`;
-      drawGlassBtn(ctx, btnX, btnY, btnW, btnH, priceText, 'rgba(255,107,53,0.45)', 'rgba(255,160,100,0.5)');
+      drawNeoBtn(ctx, btnX, btnY, btnW, btnH, priceText, '#FF6B35');
       itemButtonAreas.push({ id: skin.id, area: { x: btnX, y: btnY, width: btnW, height: btnH } });
 
     } else if (unlockInfo.unlockScore != null) {
@@ -487,7 +466,7 @@ function renderSkinsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
       // or ₩X 버튼
       const btnY = ry + (rowH - btnH) / 2;
       const orPrice = skin.price >= 1000 ? `₩${(skin.price / 1000).toFixed(1)}K` : `₩${skin.price.toLocaleString()}`;
-      drawGlassBtn(ctx, btnX, btnY, btnW, btnH, `or ${orPrice}`, 'rgba(255,200,50,0.35)', 'rgba(255,220,100,0.5)', '10px');
+      drawNeoBtn(ctx, btnX, btnY, btnW, btnH, `or ${orPrice}`, '#D4A020', '10px');
       itemButtonAreas.push({ id: skin.id, area: { x: btnX, y: btnY, width: btnW, height: btnH } });
 
     } else {
@@ -499,7 +478,7 @@ function renderSkinsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
 
       const btnY = ry + (rowH - btnH) / 2;
       const priceText = skin.price >= 1000 ? `₩${(skin.price / 1000).toFixed(1)}K` : `₩${skin.price.toLocaleString()}`;
-      drawGlassBtn(ctx, btnX, btnY, btnW, btnH, priceText, 'rgba(255,107,53,0.45)', 'rgba(255,160,100,0.5)');
+      drawNeoBtn(ctx, btnX, btnY, btnW, btnH, priceText, '#FF6B35');
       itemButtonAreas.push({ id: skin.id, area: { x: btnX, y: btnY, width: btnW, height: btnH } });
     }
   });
@@ -585,7 +564,7 @@ function renderAchievementsTab(ctx: CanvasRenderingContext2D, x: number, y: numb
 // ── 상점 버튼 렌더링 (게임 오버 화면에서) ───────────────────
 export function renderShopButton(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   const btn = getShopButtonArea(w, h);
-  drawGlassBtn(ctx, btn.x, btn.y, btn.width, btn.height, '🛒 상점', 'rgba(255,107,53,0.75)', 'rgba(255,180,130,0.6)', '14px');
+  drawNeoBtn(ctx, btn.x, btn.y, btn.width, btn.height, '🛒 상점', '#FF6B35', '14px');
 }
 
 // ── 업적 달성 팝업 렌더링 ───────────────────────────────────
@@ -665,31 +644,25 @@ export function renderAchievementPopup(ctx: CanvasRenderingContext2D, w: number,
   ctx.restore();
 }
 
-// ── 유틸: 글라스모피즘 버튼 ──────────────────────────────────
-function drawGlassBtn(
+// ── 유틸: Neobrutalism 버튼 ──────────────────────────────────
+function drawNeoBtn(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, w: number, h: number,
-  label: string, bg: string, border: string, fontSize: string = '11px',
+  label: string, bg: string, fontSize: string = '11px',
 ): void {
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath();
+  roundRect(ctx, x + 2, y + 2, w, h, 6);
+  ctx.fill();
   ctx.fillStyle = bg;
   ctx.beginPath();
-  roundRect(ctx, x, y, w, h, 8);
+  roundRect(ctx, x, y, w, h, 6);
   ctx.fill();
-
-  const hlG = ctx.createLinearGradient(x, y, x, y + h * 0.5);
-  hlG.addColorStop(0, 'rgba(255,255,255,0.18)');
-  hlG.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = hlG;
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  roundRect(ctx, x, y, w, h * 0.5, 8);
-  ctx.fill();
-
-  ctx.strokeStyle = border;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  roundRect(ctx, x, y, w, h, 8);
+  roundRect(ctx, x, y, w, h, 6);
   ctx.stroke();
-
   ctx.fillStyle = '#FFF';
   ctx.font = `bold ${fontSize} sans-serif`;
   ctx.textAlign = 'center';
