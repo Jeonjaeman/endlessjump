@@ -329,7 +329,7 @@ function renderItemsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
     ctx.fillStyle = '#FFF';
     ctx.font = 'bold 12px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('₩1,100', btnX + btnW / 2, btnY + btnH / 2 + 4);
+    ctx.fillText('₩3,300', btnX + btnW / 2, btnY + btnH / 2 + 4);
 
     itemButtonAreas.push({
       id: 'endlessjump_remove_ads',
@@ -585,16 +585,7 @@ function renderAchievementsTab(ctx: CanvasRenderingContext2D, x: number, y: numb
 // ── 상점 버튼 렌더링 (게임 오버 화면에서) ───────────────────
 export function renderShopButton(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   const btn = getShopButtonArea(w, h);
-
-  ctx.fillStyle = 'rgba(255,107,53,0.8)';
-  ctx.beginPath();
-  roundRect(ctx, btn.x, btn.y, btn.width, btn.height, 8);
-  ctx.fill();
-
-  ctx.fillStyle = '#FFF';
-  ctx.font = 'bold 14px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('🛒 상점', btn.x + btn.width / 2, btn.y + btn.height / 2 + 5);
+  drawGlassBtn(ctx, btn.x, btn.y, btn.width, btn.height, '🛒 상점', 'rgba(255,107,53,0.75)', 'rgba(255,180,130,0.6)', '14px');
 }
 
 // ── 업적 달성 팝업 렌더링 ───────────────────────────────────

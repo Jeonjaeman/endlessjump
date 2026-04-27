@@ -44,7 +44,7 @@ const DEFAULT_PRODUCTS: IAPProduct[] = [
     id: PRODUCT_REMOVE_ADS,
     name: '광고 제거',
     description: '모든 광고를 영구적으로 제거합니다',
-    price: '₩1,100',
+    price: '₩3,300',
     type: 'non_consumable',
   },
   {

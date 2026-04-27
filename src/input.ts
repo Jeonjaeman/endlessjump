@@ -22,6 +22,7 @@ export class InputManager {
     let dragStartY = 0;
     let isDragging = false;
     let lastDragY = 0;
+    let shopWasOpen = false;
 
     // ── Touch ──────────────────────────────────────────────────
     canvas.addEventListener('touchstart', (e) => {
@@ -29,10 +30,12 @@ export class InputManager {
       cb.initAudio();
       const t = e.touches[0];
       if (isShopOpen()) {
+        shopWasOpen = true;
         handleShopPointerDown(t.clientX, t.clientY);
         handleShopTap(t.clientX, t.clientY);
         return;
       }
+      shopWasOpen = false;
       if (cb.state === GameState.START) { cb.onStartGame(); return; }
       if (cb.state === GameState.GAME_OVER) {
         dragStartX = t.clientX;
@@ -67,7 +70,7 @@ export class InputManager {
 
     canvas.addEventListener('touchend', (e) => {
       e.preventDefault();
-      if (isShopOpen()) { handleShopPointerUp(); return; }
+      if (shopWasOpen || isShopOpen()) { shopWasOpen = false; handleShopPointerUp(); return; }
       if (cb.state === GameState.GAME_OVER) {
         if (!isDragging) {
           cb.onGameOverTap(dragStartX, dragStartY);
@@ -82,10 +85,12 @@ export class InputManager {
     canvas.addEventListener('mousedown', (e) => {
       cb.initAudio();
       if (isShopOpen()) {
+        shopWasOpen = true;
         handleShopPointerDown(e.clientX, e.clientY);
         handleShopTap(e.clientX, e.clientY);
         return;
       }
+      shopWasOpen = false;
       if (cb.state === GameState.START) { cb.onStartGame(); return; }
       if (cb.state === GameState.GAME_OVER) {
         dragStartX = e.clientX;
@@ -113,7 +118,7 @@ export class InputManager {
     });
 
     canvas.addEventListener('mouseup', () => {
-      if (isShopOpen()) { handleShopPointerUp(); return; }
+      if (shopWasOpen || isShopOpen()) { shopWasOpen = false; handleShopPointerUp(); return; }
       if (cb.state === GameState.GAME_OVER) {
         if (!isDragging) {
           cb.onGameOverTap(dragStartX, dragStartY);
