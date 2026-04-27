@@ -204,14 +204,14 @@ export function renderRankingScreen(
       ctx.textAlign = 'left';
       ctx.fillStyle = 'rgba(255,255,255,0.5)';
       ctx.font = '13px sans-serif';
-      ctx.fillText(`${entry.rank}`, listX + 10, ry + 12);
+      ctx.fillText(`${entry.rank}`, listX + 6, ry + 12);
 
-      drawSkinDot(ctx, listX + 30, ry + 8, 6, entry.skin_id);
+      drawSkinDot(ctx, listX + 36, ry + 8, 6, entry.skin_id);
 
       ctx.font = '13px sans-serif';
       ctx.fillStyle = entry.is_me ? '#FF6B35' : '#FFF';
       const flag = getFlagEmoji(entry.country_code);
-      ctx.fillText(`${flag} ${entry.nickname}`, listX + 42, ry + 12);
+      ctx.fillText(`${flag} ${entry.nickname}`, listX + 48, ry + 12);
 
       ctx.textAlign = 'right';
       ctx.fillStyle = entry.is_me ? '#FFD700' : 'rgba(255,255,255,0.7)';
@@ -243,12 +243,12 @@ export function renderRankingScreen(
     ctx.textAlign = 'left';
     ctx.fillStyle = '#FF6B35';
     ctx.font = 'bold 14px sans-serif';
-    ctx.fillText(`${myRank.rank}`, listX + 10, myRowY + 12);
+    ctx.fillText(`${myRank.rank}`, listX + 6, myRowY + 12);
 
-    drawSkinDot(ctx, listX + 30, myRowY + 8, 6, myRank.skin_id);
+    drawSkinDot(ctx, listX + 36, myRowY + 8, 6, myRank.skin_id);
 
     const flag = getFlagEmoji(myRank.country_code);
-    ctx.fillText(`${flag} ${myRank.nickname}`, listX + 42, myRowY + 12);
+    ctx.fillText(`${flag} ${myRank.nickname}`, listX + 48, myRowY + 12);
 
     ctx.textAlign = 'right';
     ctx.fillStyle = '#FFD700';
