@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">BunnyHop</string>
-    <string name="title_activity_main">BunnyHop</string>
-    <string name="package_name">com.bunnyhop.game</string>
-    <string name="custom_url_scheme">com.bunnyhop.game</string>
+    <string name="app_name">EndlessJump</string>
+    <string name="title_activity_main">EndlessJump</string>
+    <string name="package_name">kr.tengtengsoft.endlessjump</string>
+    <string name="custom_url_scheme">kr.tengtengsoft.endlessjump</string>
 </resources>

@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'kr.tengtengsoft.bunnyhop',
+  appId: 'kr.tengtengsoft.endlessjump',
   appName: '무한의당근',
   webDir: 'dist',
   plugins: {

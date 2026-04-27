@@ -18,17 +18,17 @@ const isNative = Capacitor.isNativePlatform();
 const REVENUECAT_API_KEY = 'YOUR_REVENUECAT_API_KEY';
 
 // ── 상품 ID 상수 ─────────────────────────────────────────────
-export const PRODUCT_REMOVE_ADS = 'bunnyhop_remove_ads';
-export const PRODUCT_SKIN_PACK_PINK = 'bunnyhop_skin_pink';
-export const PRODUCT_SKIN_PACK_GOLDEN = 'bunnyhop_skin_golden';
-export const PRODUCT_SKIN_PACK_SHADOW = 'bunnyhop_skin_shadow';
-export const PRODUCT_SKIN_PACK_SHADOW_NINJA = 'bunnyhop_skin_shadow_ninja';
-export const PRODUCT_SKIN_PACK_OCEAN_PIRATE = 'bunnyhop_skin_ocean_pirate';
-export const PRODUCT_SKIN_PACK_METAL_HERO = 'bunnyhop_skin_metal_hero';
-export const PRODUCT_SKIN_PACK_THUNDER_GUARDIAN = 'bunnyhop_skin_thunder_guardian';
-export const PRODUCT_SKIN_PACK_JUNGLE_KING = 'bunnyhop_skin_jungle_king';
-export const PRODUCT_SKIN_PACK_CLAW_FIGHTER = 'bunnyhop_skin_claw_fighter';
-export const PRODUCT_SKIN_PACK_SPACE_EXPLORER = 'bunnyhop_skin_space_explorer';
+export const PRODUCT_REMOVE_ADS = 'endlessjump_remove_ads';
+export const PRODUCT_SKIN_PACK_PINK = 'endlessjump_skin_pink';
+export const PRODUCT_SKIN_PACK_GOLDEN = 'endlessjump_skin_golden';
+export const PRODUCT_SKIN_PACK_SHADOW = 'endlessjump_skin_shadow';
+export const PRODUCT_SKIN_PACK_SHADOW_NINJA = 'endlessjump_skin_shadow_ninja';
+export const PRODUCT_SKIN_PACK_OCEAN_PIRATE = 'endlessjump_skin_ocean_pirate';
+export const PRODUCT_SKIN_PACK_METAL_HERO = 'endlessjump_skin_metal_hero';
+export const PRODUCT_SKIN_PACK_THUNDER_GUARDIAN = 'endlessjump_skin_thunder_guardian';
+export const PRODUCT_SKIN_PACK_JUNGLE_KING = 'endlessjump_skin_jungle_king';
+export const PRODUCT_SKIN_PACK_CLAW_FIGHTER = 'endlessjump_skin_claw_fighter';
+export const PRODUCT_SKIN_PACK_SPACE_EXPLORER = 'endlessjump_skin_space_explorer';
 
 const ALL_SKIN_PRODUCTS = [
   PRODUCT_SKIN_PACK_PINK, PRODUCT_SKIN_PACK_GOLDEN, PRODUCT_SKIN_PACK_SHADOW,

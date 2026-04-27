@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "kr.tengtengsoft.bunnyhop"
+    namespace = "kr.tengtengsoft.endlessjump"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "kr.tengtengsoft.bunnyhop"
+        applicationId "kr.tengtengsoft.endlessjump"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

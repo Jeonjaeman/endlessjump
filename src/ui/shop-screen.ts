@@ -332,7 +332,7 @@ function renderItemsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
     ctx.fillText('₩1,100', btnX + btnW / 2, btnY + btnH / 2 + 4);
 
     itemButtonAreas.push({
-      id: 'bunnyhop_remove_ads',
+      id: 'endlessjump_remove_ads',
       area: { x: btnX, y: btnY, width: btnW, height: btnH },
     });
   }
