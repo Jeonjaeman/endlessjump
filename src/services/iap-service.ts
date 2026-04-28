@@ -9,7 +9,10 @@
 
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { setAdsRemoved } from './ad-service';
+import { getSupabaseUserEmail } from './auth';
 import type { IAPProduct } from '../types';
+
+const DEV_EMAIL = 'jeonjaeman9668@gmail.com';
 
 // ── 플랫폼 감지 ──────────────────────────────────────────────
 const isNative = Capacitor.isNativePlatform();
@@ -196,6 +199,10 @@ export async function restorePurchases(): Promise<boolean> {
 
 // ── 구매 상태 확인 ──────────────────────────────────────────
 export function isProductPurchased(productId: string): boolean {
+  // 개발자 계정은 모든 스킨 무료 (광고 제거 제외)
+  if (productId !== PRODUCT_REMOVE_ADS && ALL_SKIN_PRODUCTS.includes(productId)) {
+    if (getSupabaseUserEmail() === DEV_EMAIL) return true;
+  }
   return purchasedProducts.has(productId);
 }
 

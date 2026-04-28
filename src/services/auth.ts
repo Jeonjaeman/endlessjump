@@ -47,9 +47,14 @@ export function saveLocalProfile(profile: LocalProfile): void {
 }
 
 let supabaseUserId: string | null = null;
+let supabaseUserEmail: string | null = null;
 
 export function getSupabaseUserId(): string | null {
   return supabaseUserId;
+}
+
+export function getSupabaseUserEmail(): string | null {
+  return supabaseUserEmail;
 }
 
 export async function initAuth(): Promise<string | null> {
@@ -61,6 +66,7 @@ export async function initAuth(): Promise<string | null> {
     const { data: { session } } = await sb.auth.getSession();
     if (session?.user) {
       supabaseUserId = session.user.id;
+      supabaseUserEmail = session.user.email ?? null;
       // Google 연결 상태 감지
       if (session.user.app_metadata?.provider === 'google'
           || (session.user.identities ?? []).some((i: any) => i.provider === 'google')) {
@@ -81,6 +87,7 @@ export async function initAuth(): Promise<string | null> {
         });
         if (!signInError && signInData.user) {
           supabaseUserId = signInData.user.id;
+          supabaseUserEmail = signInData.user.email ?? null;
           await ensureProfile();
           flushQueue();
           return supabaseUserId;
@@ -95,6 +102,7 @@ export async function initAuth(): Promise<string | null> {
     if (error || !data.user) return null;
 
     supabaseUserId = data.user.id;
+    supabaseUserEmail = data.user.email ?? null;
     await ensureProfile();
     flushQueue();
     return supabaseUserId;
