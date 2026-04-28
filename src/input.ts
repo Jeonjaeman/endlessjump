@@ -14,7 +14,7 @@ export interface InputCallbacks {
   onTouchEnd(): void;
 }
 
-const DRAG_THRESHOLD = 8; // px — 이 이상 움직이면 드래그로 판정
+const DRAG_THRESHOLD = 20; // px — 이 이상 움직이면 드래그로 판정
 
 export class InputManager {
   constructor(canvas: HTMLCanvasElement, cb: InputCallbacks) {

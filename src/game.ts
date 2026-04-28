@@ -580,10 +580,12 @@ export class Game {
     await this.loadRankings();
 
     // 현재 기록이 TOP 10에 들 수 있는지 체크
+    // 최소 200mm 이상이고 당근을 1개 이상 먹어야 댓글창 표시
     const top10Heights = this.rankings.map(r => r.height);
-    const wouldBeTop10 = top10Heights.length < 10 || heightMm > Math.min(...top10Heights);
+    const wouldBeTop10 = (top10Heights.length < 10 || heightMm > Math.min(...top10Heights));
+    const isWorthCommenting = heightMm >= 200 && score >= 1;
 
-    if (wouldBeTop10) {
+    if (wouldBeTop10 && isWorthCommenting) {
       const comment = await this.showCommentOverlay();
       await this.submitAndLoadRankings(heightMm, score, skinId, comment);
     } else {
