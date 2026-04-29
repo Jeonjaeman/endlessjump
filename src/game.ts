@@ -741,9 +741,12 @@ export class Game {
     return worldY - this.cameraY + this.h / 2;
   }
 
-  private perspectiveScale(worldY: number): number {
-    const distFromBunny = Math.abs(worldY - this.bunnyY);
-    return clamp(1.0 - distFromBunny * 0.00008, 0.7, 1.0);
+  private perspectiveScale(_worldY: number): number {
+    // 5만 미만: 1.0, 5만~10만: 1.0→0.5 선형 축소, 10만 이상: 0.5 고정
+    const h = this.heightReached;
+    if (h < 50000) return 1.0;
+    if (h >= 100000) return 0.5;
+    return 1.0 - (h - 50000) / 50000 * 0.5;
   }
 
   private lastTime = 0;
