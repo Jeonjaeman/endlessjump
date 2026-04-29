@@ -1,4 +1,4 @@
-import { getLocalProfile, saveLocalProfile, updateProfile, getSupabaseUserId, type LocalProfile } from '../services/auth';
+import { getLocalProfile, saveLocalProfile, updateProfile, getSupabaseUserId, isAccountLinked, linkGoogleAccount, type LocalProfile } from '../services/auth';
 import { getSupabase } from '../services/supabase';
 
 const COUNTRY_FLAGS: [string, string, string][] = [
@@ -119,14 +119,23 @@ function createModal(profile: LocalProfile): void {
 
     const sb = getSupabase();
     if (sb) {
-      const myId = getSupabaseUserId();
-      const { data } = await sb.from('profiles')
-        .select('id')
-        .eq('nickname', nickname)
-        .neq('id', myId ?? '')
-        .limit(1);
-      if (data && data.length > 0) {
-        errorMsg.textContent = '이미 사용 중인 닉네임입니다.';
+      try {
+        const myId = getSupabaseUserId();
+        const { data, error } = await sb.from('profiles')
+          .select('id')
+          .ilike('nickname', nickname)
+          .neq('id', myId ?? '00000000-0000-0000-0000-000000000000')
+          .limit(1);
+        if (error) {
+          errorMsg.textContent = '닉네임 확인 중 오류가 발생했습니다.';
+          return;
+        }
+        if (data && data.length > 0) {
+          errorMsg.textContent = '이미 사용 중인 닉네임입니다.';
+          return;
+        }
+      } catch {
+        errorMsg.textContent = '닉네임 확인 중 오류가 발생했습니다.';
         return;
       }
     }
@@ -137,6 +146,31 @@ function createModal(profile: LocalProfile): void {
     closeModal(newProfile);
   });
   box.appendChild(saveBtn);
+
+  // Google 연동 버튼 (미연동 시)
+  if (!isAccountLinked()) {
+    const googleBtn = el('button', `
+      width:100%;padding:12px;background:#4285F4;
+      border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:bold;
+      cursor:pointer;margin-top:10px;display:flex;align-items:center;
+      justify-content:center;gap:8px;
+    `);
+    googleBtn.textContent = 'G  Google로 기록 영구 저장';
+    googleBtn.addEventListener('click', async () => {
+      googleBtn.textContent = '연결 중...';
+      googleBtn.style.opacity = '0.7';
+      const success = await linkGoogleAccount();
+      if (success) {
+        googleBtn.textContent = '연결 완료!';
+        googleBtn.style.background = '#4CAF50';
+        setTimeout(() => googleBtn.remove(), 1500);
+      } else {
+        googleBtn.textContent = 'G  Google로 기록 영구 저장';
+        googleBtn.style.opacity = '1';
+      }
+    });
+    box.appendChild(googleBtn);
+  }
 
   modalElement.appendChild(box);
   document.body.appendChild(modalElement);

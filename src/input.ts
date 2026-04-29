@@ -6,6 +6,7 @@ export interface InputCallbacks {
   readonly w: number;
   initAudio(): void;
   onStartGame(): void;
+  onStartTap(x: number, y: number): void;
   onGameOverTap(x: number, y: number): void;
   onGameOverDrag(dy: number): void;
   onGameOverWheel(dy: number): void;
@@ -50,7 +51,7 @@ export class InputManager {
         return;
       }
       shopWasOpen = false;
-      if (cb.state === GameState.START) { cb.onStartGame(); return; }
+      if (cb.state === GameState.START) { cb.onStartTap(cx, cy); return; }
       if (cb.state === GameState.GAME_OVER) {
         dragStartX = cx;
         dragStartY = cy;
@@ -109,7 +110,7 @@ export class InputManager {
         return;
       }
       shopWasOpen = false;
-      if (cb.state === GameState.START) { cb.onStartGame(); return; }
+      if (cb.state === GameState.START) { cb.onStartTap(cx, cy); return; }
       if (cb.state === GameState.GAME_OVER) {
         dragStartX = cx;
         dragStartY = cy;

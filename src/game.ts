@@ -121,6 +121,21 @@ export class Game {
         this.hasJumped = true;
         this.touching = true;
         this.startTime = performance.now();
+        this.bg.setSkin(getSelectedSkinId());
+        this.audio.setBGM(getSelectedSkinId());
+        this.audio.startBGM();
+        if (!areAdsRemoved()) showBanner();
+      },
+      onStartTap: (x: number, y: number) => {
+        if (this.handleShopButtonTap(x, y)) return;
+        if (this.handleStartGoogleTap(x, y)) return;
+        // 버튼이 아닌 영역 탭 → 게임 시작
+        this.state = GameState.PLAYING;
+        this.velY = JUMP_VELOCITY;
+        this.hasJumped = true;
+        this.touching = true;
+        this.startTime = performance.now();
+        this.bg.setSkin(getSelectedSkinId());
         this.audio.setBGM(getSelectedSkinId());
         this.audio.startBGM();
         if (!areAdsRemoved()) showBanner();
@@ -152,6 +167,7 @@ export class Game {
     getLocalUUID();
     initAuth();
     initSkins();
+    this.bg.setSkin(getSelectedSkinId());
     initAchievements();
     initIAP();
     initAds();
@@ -292,10 +308,10 @@ export class Game {
       const height = this.groundY - this.poolTopY;
       const zone = getZone(height);
 
-      // Zone 레벨에 따라 safeMaxGap 조정
+      // Zone 레벨에 따라 safeMaxGap 조정 (최대 점프높이의 88%로 제한)
       const zoneLevel = height < 2000 ? 0 : height < 5000 ? 1 : height < 8000 ? 2
         : height < 12000 ? 3 : height < 20000 ? 4 : height < 35000 ? 5 : 6;
-      const safeMaxGap = NORMAL_JUMP_PEAK * (0.75 + zoneLevel * 0.05);
+      const safeMaxGap = NORMAL_JUMP_PEAK * Math.min(0.75 + zoneLevel * 0.04, 0.88);
 
       // Clamp zone gaps to safe bounds so bunny can always reach the next carrot
       const minGap = Math.min(zone.minGap, safeMinGap);
@@ -726,13 +742,23 @@ export class Game {
   }
 
   private lastTime = 0;
+  private accumulator = 0;
+  private readonly FIXED_DT = 1000 / 60; // 60fps 고정 타임스텝
+
   private loop(time: number): void {
     if (this.lastTime === 0) this.lastTime = time;
     const dt = time - this.lastTime;
     this.lastTime = time;
 
     if (dt < 100) {
-      this.update();
+      this.accumulator += dt;
+      // 고정 타임스텝만큼 누적되면 update (최대 3회로 제한)
+      let steps = 0;
+      while (this.accumulator >= this.FIXED_DT && steps < 3) {
+        this.update();
+        this.accumulator -= this.FIXED_DT;
+        steps++;
+      }
     }
 
     this.render();
@@ -786,6 +812,8 @@ export class Game {
       renderCarrots(ctx, startRs);
       renderBunny(ctx, startRs, this.w / 2, startWorldToScreen(this.groundY - BUNNY_RADIUS - 10));
       renderStartScreen(ctx, this.w, this.h, this.bestScore, this.bestHeight);
+      renderShopButton(ctx, this.w, this.h);
+      this.renderStartGoogleButton(ctx);
     } else if (this.state === GameState.GAME_OVER) {
       renderGround(ctx, rs, this.groundY);
       renderCarrots(ctx, rs);
@@ -867,6 +895,49 @@ export class Game {
       return true;
     }
     return false;
+  }
+
+  private getStartGoogleBtnArea(): { x: number; y: number; width: number; height: number } {
+    const btnW = 220;
+    const btnH = 38;
+    return { x: this.w / 2 - btnW / 2, y: this.h * 0.72, width: btnW, height: btnH };
+  }
+
+  private handleStartGoogleTap(x: number, y: number): boolean {
+    if (isAccountLinked()) return false;
+    const btn = this.getStartGoogleBtnArea();
+    if (x >= btn.x && x <= btn.x + btn.width &&
+        y >= btn.y && y <= btn.y + btn.height) {
+      linkGoogleAccount().catch((e) => console.warn('[Game] Google 연결 실패:', e));
+      return true;
+    }
+    return false;
+  }
+
+  private renderStartGoogleButton(ctx: CanvasRenderingContext2D): void {
+    if (isAccountLinked()) return;
+    const btn = this.getStartGoogleBtnArea();
+    // 배경 그림자
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.beginPath();
+    ctx.roundRect(btn.x + 2, btn.y + 2, btn.width, btn.height, 8);
+    ctx.fill();
+    // 배경
+    ctx.fillStyle = '#4285F4';
+    ctx.beginPath();
+    ctx.roundRect(btn.x, btn.y, btn.width, btn.height, 8);
+    ctx.fill();
+    // 테두리
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(btn.x, btn.y, btn.width, btn.height, 8);
+    ctx.stroke();
+    // 텍스트
+    ctx.fillStyle = '#FFF';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('G  Google로 기록 영구 저장', btn.x + btn.width / 2, btn.y + btn.height / 2 + 5);
   }
 
   private handleTabTap(x: number, y: number): boolean {
