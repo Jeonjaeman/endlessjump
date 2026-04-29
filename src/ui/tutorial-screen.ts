@@ -1,6 +1,7 @@
 /**
  * 첫 실행 튜토리얼 오버레이
- * - 3단계 애니메이션으로 게임 방법 안내
+ * - 손 모양이 화면을 터치하고 좌우로 이동하는 모션
+ * - "손가락을 떼지 않고 당근을 먹고 점프하세요" 안내
  * - localStorage로 1회만 표시
  */
 
@@ -14,17 +15,12 @@ export function markTutorialShown(): void {
   localStorage.setItem(TUTORIAL_KEY, '1');
 }
 
-// 튜토리얼 상태
 let tutorialActive = false;
-let tutorialStep = 0; // 0: 터치, 1: 좌우이동, 2: 당근점프
-let stepTimer = 0;
-const STEP_DURATION = 180; // 3초 @ 60fps
-const TOTAL_STEPS = 3;
+let frameCount = 0;
 
 export function startTutorial(): void {
   tutorialActive = true;
-  tutorialStep = 0;
-  stepTimer = 0;
+  frameCount = 0;
 }
 
 export function isTutorialActive(): boolean {
@@ -32,267 +28,236 @@ export function isTutorialActive(): boolean {
 }
 
 export function handleTutorialTap(): void {
-  tutorialStep++;
-  stepTimer = 0;
-  if (tutorialStep >= TOTAL_STEPS) {
-    tutorialActive = false;
-    markTutorialShown();
-  }
+  tutorialActive = false;
+  markTutorialShown();
 }
 
 export function renderTutorial(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   if (!tutorialActive) return;
 
-  stepTimer++;
+  frameCount++;
+  const t = frameCount / 60;
 
   // 어두운 오버레이
-  ctx.fillStyle = 'rgba(0,0,0,0.75)';
+  ctx.fillStyle = 'rgba(0,0,0,0.78)';
   ctx.fillRect(0, 0, w, h);
 
   const cx = w / 2;
-  const t = stepTimer / 60; // 초 단위 시간
 
-  if (tutorialStep === 0) {
-    drawStep1_Touch(ctx, cx, h, t);
-  } else if (tutorialStep === 1) {
-    drawStep2_Move(ctx, cx, w, h, t);
-  } else if (tutorialStep === 2) {
-    drawStep3_Jump(ctx, cx, w, h, t);
-  }
-
-  // 하단 "탭하여 다음" 표시
-  const blink = Math.sin(Date.now() * 0.005) * 0.3 + 0.7;
-  ctx.globalAlpha = blink;
+  // ── 상단 안내 텍스트 ──────────────────────────────────────
+  ctx.textAlign = 'center';
   ctx.fillStyle = '#FFF';
-  ctx.font = 'bold 14px sans-serif';
-  ctx.textAlign = 'center';
-  const nextText = tutorialStep < TOTAL_STEPS - 1 ? 'Tap to Next' : 'Tap to Start!';
-  ctx.fillText(nextText, cx, h - 40);
-  ctx.globalAlpha = 1.0;
+  ctx.font = 'bold 20px sans-serif';
+  ctx.fillText('손가락을 떼지 않고', cx, h * 0.12);
+  ctx.fillText('당근을 먹고 점프하세요!', cx, h * 0.12 + 30);
 
-  // 단계 인디케이터 (점 3개)
-  for (let i = 0; i < TOTAL_STEPS; i++) {
-    ctx.beginPath();
-    ctx.arc(cx - 20 + i * 20, h - 65, 4, 0, Math.PI * 2);
-    ctx.fillStyle = i === tutorialStep ? '#FF6B35' : 'rgba(255,255,255,0.3)';
-    ctx.fill();
-  }
-}
+  // ── 중앙: 손 + 좌우 이동 모션 ─────────────────────────────
+  const handCenterY = h * 0.38;
+  const moveRange = Math.min(w * 0.22, 70);
 
-// ── Step 1: 화면을 터치하세요 ─────────────────────────────────
-function drawStep1_Touch(ctx: CanvasRenderingContext2D, cx: number, h: number, t: number): void {
-  const centerY = h * 0.4;
+  // 페이즈: 처음 1초는 내려오기, 이후 좌우 이동
+  const enterDone = Math.min(t, 0.8);
+  const handBaseY = handCenterY - 40 + enterDone * 50; // 위에서 내려옴
+  const handX = t < 0.8 ? cx : cx + Math.sin((t - 0.8) * 2.0) * moveRange;
 
-  // 제목
-  ctx.fillStyle = '#FF6B35';
-  ctx.font = 'bold 22px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('화면을 터치하세요', cx, h * 0.18);
-
-  ctx.fillStyle = 'rgba(255,255,255,0.6)';
-  ctx.font = '14px sans-serif';
-  ctx.fillText('손가락을 떼지 마세요!', cx, h * 0.24);
-
-  // 손가락 아이콘 (아래로 내려오는 모션)
-  const fingerY = centerY + Math.min(t * 40, 30);
-  const pulse = Math.sin(t * 4) * 0.15 + 1;
-
-  // 터치 파동
-  if (t > 0.7) {
-    const rippleAlpha = Math.max(0, 0.4 - ((t - 0.7) % 1.2) * 0.5);
-    const rippleR = 20 + ((t - 0.7) % 1.2) * 30;
+  // 터치 포인트 파동 (터치 후)
+  if (t > 0.6) {
+    const rippleT = (t - 0.6) % 1.5;
+    const rippleAlpha = Math.max(0, 0.5 - rippleT * 0.4);
+    const rippleR = 15 + rippleT * 35;
     ctx.strokeStyle = `rgba(255,107,53,${rippleAlpha})`;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(cx, fingerY + 30, rippleR, 0, Math.PI * 2);
+    ctx.arc(handX, handBaseY + 65, rippleR, 0, Math.PI * 2);
     ctx.stroke();
+
+    // 두 번째 파동 (시차)
+    if (rippleT > 0.5) {
+      const r2 = rippleT - 0.5;
+      const a2 = Math.max(0, 0.4 - r2 * 0.4);
+      ctx.strokeStyle = `rgba(255,107,53,${a2})`;
+      ctx.beginPath();
+      ctx.arc(handX, handBaseY + 65, 15 + r2 * 35, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
 
-  // 터치 포인트
-  ctx.beginPath();
-  ctx.arc(cx, fingerY + 30, 12 * pulse, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(255,107,53,0.5)';
-  ctx.fill();
+  // 터치 포인트 글로우
+  if (t > 0.6) {
+    const glow = Math.sin(t * 3) * 0.15 + 0.45;
+    ctx.beginPath();
+    ctx.arc(handX, handBaseY + 65, 14, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,107,53,${glow})`;
+    ctx.fill();
+  }
 
-  // 손가락 (간단한 형태)
-  drawFinger(ctx, cx, fingerY, 1.0);
-}
+  // 손 그리기
+  drawHand(ctx, handX, handBaseY, t > 0.8 ? 1.0 : 0.9 + enterDone * 0.125);
 
-// ── Step 2: 좌우로 움직이세요 ─────────────────────────────────
-function drawStep2_Move(ctx: CanvasRenderingContext2D, cx: number, w: number, h: number, t: number): void {
-  const centerY = h * 0.4;
+  // ── 좌우 화살표 (이동 시작 후) ────────────────────────────
+  if (t > 1.0) {
+    const arrowAlpha = Math.min(1, (t - 1.0) * 2);
+    ctx.globalAlpha = arrowAlpha * 0.4;
+    ctx.fillStyle = '#FFF';
+    ctx.font = 'bold 32px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('\u2190', cx - moveRange - 35, handBaseY + 72);
+    ctx.fillText('\u2192', cx + moveRange + 35, handBaseY + 72);
+    ctx.globalAlpha = 1;
+  }
 
-  // 제목
-  ctx.fillStyle = '#4FC3F7';
-  ctx.font = 'bold 22px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('좌우로 움직이세요', cx, h * 0.18);
-
-  ctx.fillStyle = 'rgba(255,255,255,0.6)';
-  ctx.font = '14px sans-serif';
-  ctx.fillText('터치한 채로 좌우로 슬라이드!', cx, h * 0.24);
-
-  // 좌우 이동 경로 표시
-  const moveRange = Math.min(w * 0.25, 80);
-  const fingerX = cx + Math.sin(t * 2.5) * moveRange;
-
-  // 이동 경로 (점선)
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([6, 4]);
-  ctx.beginPath();
-  ctx.moveTo(cx - moveRange, centerY + 30);
-  ctx.lineTo(cx + moveRange, centerY + 30);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // 좌우 화살표
-  ctx.fillStyle = 'rgba(255,255,255,0.3)';
-  ctx.font = 'bold 28px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('\u2190', cx - moveRange - 20, centerY + 38);
-  ctx.fillText('\u2192', cx + moveRange + 20, centerY + 38);
-
-  // 터치 포인트 (이동 중)
-  ctx.beginPath();
-  ctx.arc(fingerX, centerY + 30, 10, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(79,195,247,0.5)';
-  ctx.fill();
-
-  // 손가락
-  drawFinger(ctx, fingerX, centerY, 1.0);
-
-  // 토끼 (손가락 따라 이동)
-  drawMiniBunny(ctx, fingerX, centerY + 80);
-}
-
-// ── Step 3: 당근을 먹으며 점프 ────────────────────────────────
-function drawStep3_Jump(ctx: CanvasRenderingContext2D, cx: number, w: number, h: number, t: number): void {
-  const baseY = h * 0.65;
-
-  // 제목
-  ctx.fillStyle = '#FFD700';
-  ctx.font = 'bold 22px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('당근 위에서 점프!', cx, h * 0.13);
-
-  ctx.fillStyle = 'rgba(255,255,255,0.6)';
-  ctx.font = '14px sans-serif';
-  ctx.fillText('당근을 밟으면 자동으로 점프합니다', cx, h * 0.19);
-
-  // 당근 3개 배치
+  // ── 하단: 당근 + 토끼 점프 데모 ──────────────────────────
+  const demoBaseY = h * 0.72;
   const carrotPositions = [
-    { x: cx - 60, y: baseY },
-    { x: cx + 30, y: baseY - 70 },
-    { x: cx - 20, y: baseY - 150 },
+    { x: cx - 55, y: demoBaseY },
+    { x: cx + 35, y: demoBaseY - 55 },
+    { x: cx - 15, y: demoBaseY - 120 },
   ];
 
   for (const pos of carrotPositions) {
     drawMiniCarrot(ctx, pos.x, pos.y);
   }
 
-  // 토끼 점프 애니메이션 (당근 사이를 이동)
-  const cycle = t % 3;
+  // 토끼 점프 (2초 주기)
+  const jumpT = Math.max(0, t - 0.5) % 2.4;
   let bunnyX: number, bunnyY: number;
 
-  if (cycle < 1) {
-    // 첫 번째 당근 → 두 번째 당근
-    const p = cycle;
+  if (jumpT < 0.8) {
+    const p = jumpT / 0.8;
     bunnyX = carrotPositions[0].x + (carrotPositions[1].x - carrotPositions[0].x) * p;
-    const jumpH = -80 * Math.sin(p * Math.PI);
-    bunnyY = carrotPositions[0].y + (carrotPositions[1].y - carrotPositions[0].y) * p + jumpH;
-  } else if (cycle < 2) {
-    // 두 번째 당근 → 세 번째 당근
-    const p = cycle - 1;
+    bunnyY = carrotPositions[0].y + (carrotPositions[1].y - carrotPositions[0].y) * p - 60 * Math.sin(p * Math.PI);
+  } else if (jumpT < 1.6) {
+    const p = (jumpT - 0.8) / 0.8;
     bunnyX = carrotPositions[1].x + (carrotPositions[2].x - carrotPositions[1].x) * p;
-    const jumpH = -80 * Math.sin(p * Math.PI);
-    bunnyY = carrotPositions[1].y + (carrotPositions[2].y - carrotPositions[1].y) * p + jumpH;
+    bunnyY = carrotPositions[1].y + (carrotPositions[2].y - carrotPositions[1].y) * p - 60 * Math.sin(p * Math.PI);
   } else {
-    // 세 번째 당근 위에서 잠시 대기 후 반복
     bunnyX = carrotPositions[2].x;
-    bunnyY = carrotPositions[2].y - 20 + Math.sin((cycle - 2) * Math.PI) * -10;
+    bunnyY = carrotPositions[2].y - 18;
   }
 
-  drawMiniBunny(ctx, bunnyX, bunnyY - 20);
+  drawMiniBunny(ctx, bunnyX, bunnyY - 18);
 
-  // 점수 팝업 효과
-  if (cycle > 0.8 && cycle < 1.3) {
-    const alpha = 1 - Math.abs(cycle - 1.05) * 4;
-    if (alpha > 0) {
-      ctx.globalAlpha = Math.min(1, alpha);
-      ctx.fillStyle = '#FFD700';
-      ctx.font = 'bold 16px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('+1', carrotPositions[1].x, carrotPositions[1].y - 30);
-      ctx.globalAlpha = 1;
-    }
-  }
-  if (cycle > 1.8 && cycle < 2.3) {
-    const alpha = 1 - Math.abs(cycle - 2.05) * 4;
-    if (alpha > 0) {
-      ctx.globalAlpha = Math.min(1, alpha);
-      ctx.fillStyle = '#FFD700';
-      ctx.font = 'bold 16px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('+1', carrotPositions[2].x, carrotPositions[2].y - 30);
-      ctx.globalAlpha = 1;
-    }
+  // +1 팝업
+  drawScorePopup(ctx, jumpT, 0.6, 0.9, carrotPositions[1]);
+  drawScorePopup(ctx, jumpT, 1.4, 1.7, carrotPositions[2]);
+
+  // ── 하단 탭 안내 ──────────────────────────────────────────
+  const blink = Math.sin(Date.now() * 0.005) * 0.3 + 0.7;
+  ctx.globalAlpha = blink;
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.font = '14px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('화면을 탭하면 시작합니다', cx, h - 30);
+  ctx.globalAlpha = 1.0;
+}
+
+function drawScorePopup(
+  ctx: CanvasRenderingContext2D, jumpT: number,
+  start: number, end: number, pos: { x: number; y: number },
+): void {
+  if (jumpT > start && jumpT < end) {
+    const alpha = 1 - Math.abs(jumpT - (start + end) / 2) / ((end - start) / 2);
+    ctx.globalAlpha = Math.min(1, alpha);
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('+1', pos.x, pos.y - 25 - (jumpT - start) * 20);
+    ctx.globalAlpha = 1;
   }
 }
 
-// ── 헬퍼: 미니 손가락 그리기 ──────────────────────────────────
-function drawFinger(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number): void {
+// ── 손 모양 그리기 ──────────────────────────────────────────
+function drawHand(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number): void {
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(scale, scale);
 
-  // 손가락 몸통 (둥근 사각형)
+  // 손바닥
   ctx.fillStyle = '#F5DEB3';
   ctx.beginPath();
-  ctx.ellipse(0, -5, 14, 22, 0, 0, Math.PI * 2);
+  ctx.moveTo(-22, 30);
+  ctx.quadraticCurveTo(-26, 10, -22, -5);
+  ctx.quadraticCurveTo(-18, -12, -10, -10);
+  ctx.lineTo(-10, -30); // 검지 시작
+  ctx.quadraticCurveTo(-8, -48, -2, -50); // 검지 끝
+  ctx.quadraticCurveTo(4, -48, 6, -30);
+  ctx.lineTo(6, -15);
+  ctx.lineTo(8, -25); // 중지 시작
+  ctx.quadraticCurveTo(10, -40, 15, -42); // 중지 끝
+  ctx.quadraticCurveTo(20, -40, 21, -25);
+  ctx.lineTo(20, -10);
+  ctx.lineTo(22, -15); // 약지
+  ctx.quadraticCurveTo(24, -28, 28, -30);
+  ctx.quadraticCurveTo(32, -28, 33, -15);
+  ctx.lineTo(32, 0);
+  ctx.lineTo(33, -5); // 소지
+  ctx.quadraticCurveTo(35, -15, 38, -16);
+  ctx.quadraticCurveTo(42, -14, 42, -5);
+  ctx.lineTo(40, 15);
+  ctx.quadraticCurveTo(38, 35, 25, 42);
+  ctx.quadraticCurveTo(10, 50, -10, 45);
+  ctx.quadraticCurveTo(-24, 42, -22, 30);
+  ctx.closePath();
   ctx.fill();
 
-  // 손가락 윤곽
-  ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+  // 손 윤곽
+  ctx.strokeStyle = 'rgba(160,120,80,0.4)';
   ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.ellipse(0, -5, 14, 22, 0, 0, Math.PI * 2);
   ctx.stroke();
 
-  // 손톱
-  ctx.fillStyle = '#FFE4C4';
+  // 손톱 (검지)
+  ctx.fillStyle = 'rgba(255,230,210,0.7)';
   ctx.beginPath();
-  ctx.ellipse(0, -20, 8, 7, 0, 0, Math.PI * 2);
+  ctx.ellipse(-2, -46, 5, 4, 0, 0, Math.PI * 2);
   ctx.fill();
+
+  // 손톱 (중지)
+  ctx.beginPath();
+  ctx.ellipse(15, -38, 4.5, 3.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 손톱 (약지)
+  ctx.beginPath();
+  ctx.ellipse(28, -27, 4, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 엄지 (왼쪽 돌출)
+  ctx.fillStyle = '#F5DEB3';
+  ctx.beginPath();
+  ctx.moveTo(-22, 10);
+  ctx.quadraticCurveTo(-35, 5, -38, -5);
+  ctx.quadraticCurveTo(-36, -15, -28, -14);
+  ctx.quadraticCurveTo(-20, -12, -18, -5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(160,120,80,0.3)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
 
   ctx.restore();
 }
 
-// ── 헬퍼: 미니 토끼 그리기 ────────────────────────────────────
+// ── 미니 토끼 ───────────────────────────────────────────────
 function drawMiniBunny(ctx: CanvasRenderingContext2D, x: number, y: number): void {
   ctx.save();
   ctx.translate(x, y);
 
-  // 몸통
   ctx.fillStyle = '#F5F2F0';
+  // 몸통
   ctx.beginPath();
   ctx.ellipse(0, 0, 12, 14, 0, 0, Math.PI * 2);
   ctx.fill();
-
   // 머리
   ctx.beginPath();
   ctx.arc(0, -16, 10, 0, Math.PI * 2);
   ctx.fill();
-
   // 귀
-  ctx.fillStyle = '#F5F2F0';
   ctx.beginPath();
   ctx.ellipse(-5, -32, 3.5, 10, -0.15, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
   ctx.ellipse(5, -32, 3.5, 10, 0.15, 0, Math.PI * 2);
   ctx.fill();
-
   // 귀 안쪽
   ctx.fillStyle = '#FFB0B8';
   ctx.beginPath();
@@ -301,7 +266,6 @@ function drawMiniBunny(ctx: CanvasRenderingContext2D, x: number, y: number): voi
   ctx.beginPath();
   ctx.ellipse(5, -32, 2, 7, 0.15, 0, Math.PI * 2);
   ctx.fill();
-
   // 눈
   ctx.fillStyle = '#333';
   ctx.beginPath();
@@ -310,7 +274,6 @@ function drawMiniBunny(ctx: CanvasRenderingContext2D, x: number, y: number): voi
   ctx.beginPath();
   ctx.arc(4, -17, 2, 0, Math.PI * 2);
   ctx.fill();
-
   // 코
   ctx.fillStyle = '#FF8899';
   ctx.beginPath();
@@ -320,18 +283,16 @@ function drawMiniBunny(ctx: CanvasRenderingContext2D, x: number, y: number): voi
   ctx.restore();
 }
 
-// ── 헬퍼: 미니 당근 그리기 ────────────────────────────────────
+// ── 미니 당근 ───────────────────────────────────────────────
 function drawMiniCarrot(ctx: CanvasRenderingContext2D, x: number, y: number): void {
   ctx.save();
   ctx.translate(x, y);
 
-  // 당근 몸체
   ctx.fillStyle = '#FF8C42';
   ctx.beginPath();
   ctx.ellipse(0, 0, 18, 8, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // 당근 줄무늬
   ctx.strokeStyle = 'rgba(0,0,0,0.1)';
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -343,7 +304,6 @@ function drawMiniCarrot(ctx: CanvasRenderingContext2D, x: number, y: number): vo
   ctx.lineTo(4, 7);
   ctx.stroke();
 
-  // 잎
   ctx.fillStyle = '#4CAF50';
   ctx.beginPath();
   ctx.ellipse(-2, -10, 3, 6, -0.3, 0, Math.PI * 2);
