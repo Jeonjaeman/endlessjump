@@ -134,9 +134,9 @@ async function handleItemTap(id: string): Promise<void> {
   if (skin) {
     if (skin.unlocked) {
       selectSkin(skin.id);
+      skinAssetLoader.setCurrentSkin(skin.id);
       const spriteDir = getSkinSpriteDir(skin.id);
       if (spriteDir) {
-        skinAssetLoader.setCurrentSkin(skin.id);
         skinAssetLoader.loadSkin(skin.id, spriteDir);
       }
     } else if (skin.productId) {
