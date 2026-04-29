@@ -91,8 +91,14 @@ export function renderTutorial(ctx: CanvasRenderingContext2D, w: number, h: numb
     ctx.fill();
   }
 
-  // 손 그리기
-  drawHand(ctx, handX, handBaseY, t > 0.8 ? 1.0 : 0.9 + enterDone * 0.125);
+  // 손가락 아이콘 (원형)
+  ctx.beginPath();
+  ctx.arc(handX, handBaseY + 40, 18, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
 
   // ── 좌우 화살표 (이동 시작 후) ────────────────────────────
   if (t > 1.0) {
@@ -164,77 +170,6 @@ function drawScorePopup(
     ctx.fillText('+1', pos.x, pos.y - 25 - (jumpT - start) * 20);
     ctx.globalAlpha = 1;
   }
-}
-
-// ── 손 모양 그리기 ──────────────────────────────────────────
-function drawHand(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number): void {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(scale, scale);
-
-  // 손바닥
-  ctx.fillStyle = '#F5DEB3';
-  ctx.beginPath();
-  ctx.moveTo(-22, 30);
-  ctx.quadraticCurveTo(-26, 10, -22, -5);
-  ctx.quadraticCurveTo(-18, -12, -10, -10);
-  ctx.lineTo(-10, -30); // 검지 시작
-  ctx.quadraticCurveTo(-8, -48, -2, -50); // 검지 끝
-  ctx.quadraticCurveTo(4, -48, 6, -30);
-  ctx.lineTo(6, -15);
-  ctx.lineTo(8, -25); // 중지 시작
-  ctx.quadraticCurveTo(10, -40, 15, -42); // 중지 끝
-  ctx.quadraticCurveTo(20, -40, 21, -25);
-  ctx.lineTo(20, -10);
-  ctx.lineTo(22, -15); // 약지
-  ctx.quadraticCurveTo(24, -28, 28, -30);
-  ctx.quadraticCurveTo(32, -28, 33, -15);
-  ctx.lineTo(32, 0);
-  ctx.lineTo(33, -5); // 소지
-  ctx.quadraticCurveTo(35, -15, 38, -16);
-  ctx.quadraticCurveTo(42, -14, 42, -5);
-  ctx.lineTo(40, 15);
-  ctx.quadraticCurveTo(38, 35, 25, 42);
-  ctx.quadraticCurveTo(10, 50, -10, 45);
-  ctx.quadraticCurveTo(-24, 42, -22, 30);
-  ctx.closePath();
-  ctx.fill();
-
-  // 손 윤곽
-  ctx.strokeStyle = 'rgba(160,120,80,0.4)';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // 손톱 (검지)
-  ctx.fillStyle = 'rgba(255,230,210,0.7)';
-  ctx.beginPath();
-  ctx.ellipse(-2, -46, 5, 4, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 손톱 (중지)
-  ctx.beginPath();
-  ctx.ellipse(15, -38, 4.5, 3.5, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 손톱 (약지)
-  ctx.beginPath();
-  ctx.ellipse(28, -27, 4, 3, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 엄지 (왼쪽 돌출)
-  ctx.fillStyle = '#F5DEB3';
-  ctx.beginPath();
-  ctx.moveTo(-22, 10);
-  ctx.quadraticCurveTo(-35, 5, -38, -5);
-  ctx.quadraticCurveTo(-36, -15, -28, -14);
-  ctx.quadraticCurveTo(-20, -12, -18, -5);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(160,120,80,0.3)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  ctx.restore();
 }
 
 // ── 미니 토끼 ───────────────────────────────────────────────
