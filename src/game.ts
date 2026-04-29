@@ -13,6 +13,7 @@ import { initAchievements, onGameOver as achOnGameOver, onCarrotEaten as achOnCa
 import { isShopOpen, openShop, renderShop, renderShopButton, getShopButtonArea, renderAchievementPopup, queueAchievementPopup, clearAchievementPopups } from './ui/shop-screen';
 import { InputManager } from './input';
 import { BackgroundRenderer } from './background';
+import { shouldShowTutorial, startTutorial, isTutorialActive, handleTutorialTap, renderTutorial } from './ui/tutorial-screen';
 import { renderClouds, renderGround, renderCarrots, renderBunny, renderParticles, renderHUD, renderStartScreen, type RenderState } from './renderer';
 
 const GRAVITY = 0.6;
@@ -127,8 +128,12 @@ export class Game {
         if (!areAdsRemoved()) showBanner();
       },
       onStartTap: (x: number, y: number) => {
+        // 튜토리얼 활성 중이면 다음 단계로
+        if (isTutorialActive()) { handleTutorialTap(); return; }
         if (this.handleShopButtonTap(x, y)) return;
         if (this.handleStartGoogleTap(x, y)) return;
+        // 첫 실행 시 튜토리얼 표시
+        if (shouldShowTutorial()) { startTutorial(); return; }
         // 버튼이 아닌 영역 탭 → 게임 시작
         this.state = GameState.PLAYING;
         this.velY = JUMP_VELOCITY;
@@ -814,6 +819,10 @@ export class Game {
       renderStartScreen(ctx, this.w, this.h, this.bestScore, this.bestHeight);
       renderShopButton(ctx, this.w, this.h);
       this.renderStartGoogleButton(ctx);
+      // 튜토리얼 오버레이 (최상위)
+      if (isTutorialActive()) {
+        renderTutorial(ctx, this.w, this.h);
+      }
     } else if (this.state === GameState.GAME_OVER) {
       renderGround(ctx, rs, this.groundY);
       renderCarrots(ctx, rs);
