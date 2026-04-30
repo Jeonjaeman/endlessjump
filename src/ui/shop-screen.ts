@@ -10,7 +10,7 @@
 import { getProducts, purchaseProduct, restorePurchases, isProductPurchased, isAdsRemoved } from '../services/iap-service';
 import { getSkins, selectSkin, getSelectedSkinId, getSkinUnlockInfo, getSkinSpriteDir } from '../services/skin-service';
 import { getAchievements } from '../services/achievement-service';
-import { showBanner, hideBanner } from '../services/ad-service';
+// 배너 광고는 game.ts에서 전역 제어 (상점 전용 제어 제거됨)
 import { skinAssetLoader } from '../skin-assets';
 import { assetManager } from '../assets';
 import type { BunnySkin, Achievement } from '../types';
@@ -59,13 +59,11 @@ export function openShop(): void {
     .map(s => ({ id: s.id, spriteDir: s.spriteDir! }));
   skinAssetLoader.loadAllThumbs(skinDirs).catch(() => {});
 
-  // 배너 광고 표시
-  showBanner();
+  // 배너 광고는 game.ts에서 이미 표시 중
 }
 
 export function closeShop(): void {
   shopOpen = false;
-  hideBanner();
 }
 
 // ── 히트 영역 ───────────────────────────────────────────────

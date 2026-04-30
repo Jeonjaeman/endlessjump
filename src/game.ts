@@ -5,7 +5,7 @@ import { submitScore } from './services/score';
 import { fetchRanking, invalidateCache } from './services/leaderboard';
 import { renderRankingScreen, getTabHitArea, getReviveHitArea, getLinkHitArea, getRankingMaxScroll } from './ui/ranking-screen';
 import { showProfileModal } from './ui/profile-modal';
-import { initAds, isRewardedReady, showRewardedAd, areAdsRemoved } from './services/ad-service';
+import { initAds, showBanner, hideBanner, isRewardedReady, showRewardedAd, areAdsRemoved } from './services/ad-service';
 import { initIAP } from './services/iap-service';
 import { initSkins, getCurrentSkinColors, getSelectedSkinId } from './services/skin-service';
 import { skinAssetLoader } from './skin-assets';
@@ -124,6 +124,7 @@ export class Game {
       initAudio: () => this.audio.initAudio(),
       onStartGame: () => {
         this.state = GameState.PLAYING;
+        hideBanner();
         this.velY = JUMP_VELOCITY;
         this.hasJumped = true;
         this.touching = true;
@@ -141,6 +142,7 @@ export class Game {
         if (shouldShowTutorial()) { startTutorial(); return; }
         // 버튼이 아닌 영역 탭 → 게임 시작
         this.state = GameState.PLAYING;
+        hideBanner();
         this.velY = JUMP_VELOCITY;
         this.hasJumped = true;
         this.touching = true;
@@ -156,6 +158,7 @@ export class Game {
         if (this.handleLinkTap(x, y)) return;
         this.resetGame();
         this.state = GameState.START;
+        showBanner();
       },
       onGameOverDrag: (dy: number) => {
         this.rankingScrollY = Math.max(0, Math.min(this.rankingMaxScroll, this.rankingScrollY + dy));
@@ -179,7 +182,7 @@ export class Game {
     this.bg.setSkin(getSelectedSkinId());
     initAchievements();
     initIAP();
-    initAds();
+    initAds().then(() => showBanner());
   }
 
   private resizeTimer = 0;
@@ -555,6 +558,7 @@ export class Game {
 
   private gameOver(): void {
     this.state = GameState.GAME_OVER;
+    showBanner();
     this.saveBest();
     this.audio.playGameOverSound();
     this.audio.stopBGM();
@@ -982,6 +986,7 @@ export class Game {
       this.poolTopY = this.bunnyY + 100;
       this.fillPoolTo(this.bunnyY - this.h * 2, this.bunnyX);
       this.state = GameState.PLAYING;
+      hideBanner();
       this.velY = JUMP_VELOCITY;
       this.hasJumped = true;
       this.audio.startBGM();
