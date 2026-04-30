@@ -596,14 +596,19 @@ export class Game {
         await this.showGooglePrompt();
       }
 
-      // [2] 닉네임 모달 (프로필 미설정 시만)
-      if (!localStorage.getItem('bh_profile_set')) {
+      // [2] 닉네임 모달 (Google 연동 완료 + 프로필 미설정 시만)
+      if (isAccountLinked() && !localStorage.getItem('bh_profile_set')) {
         await showProfileModal();
         invalidateCache();
       }
 
-      // [3] 댓글 수집 + 점수 제출 (직렬)
-      await this.collectCommentThenSubmit(this.capturedHeightMm, this.capturedScore);
+      // [3] 댓글 수집 + 점수 제출 (연동된 유저만)
+      if (isAccountLinked()) {
+        await this.collectCommentThenSubmit(this.capturedHeightMm, this.capturedScore);
+      } else {
+        // 미연동 유저: 랭킹 조회만 (점수 미저장)
+        await this.loadRankings();
+      }
     } finally {
       this.postGameFlowActive = false;
     }
