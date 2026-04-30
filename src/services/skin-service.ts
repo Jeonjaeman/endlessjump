@@ -135,6 +135,7 @@ const ALL_SKINS: BunnySkin[] = [
     productId: PRODUCT_SKIN_PACK_SHADOW,
     unlocked: false,
     spriteDir: 'shadow',
+    unlockScore: 40000,
   },
   {
     id: 'shadow_ninja',
