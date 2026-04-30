@@ -1,4 +1,4 @@
-import { getLocalProfile, saveLocalProfile, updateProfile, getSupabaseUserId, isAccountLinked, linkGoogleAccount, type LocalProfile } from '../services/auth';
+import { getLocalProfile, saveLocalProfile, updateProfile, getSupabaseUserId, isAccountLinked, createProfile, type LocalProfile } from '../services/auth';
 import { getSupabase } from '../services/supabase';
 
 const COUNTRY_FLAGS: [string, string, string][] = [
@@ -142,42 +142,28 @@ function createModal(profile: LocalProfile): void {
 
     const newProfile: LocalProfile = { nickname, country_code: selectedCode };
     saveLocalProfile(newProfile);
-    await updateProfile(newProfile);
+
+    // Google 연동 유저 + DB 프로필 미존재 → createProfile (새 프로필 생성)
+    if (isAccountLinked() && !localStorage.getItem('bh_profile_set')) {
+      try {
+        await createProfile(nickname, selectedCode);
+      } catch (e) {
+        errorMsg.textContent = '프로필 저장 중 오류가 발생했습니다. 다시 시도해주세요.';
+        console.warn('[ProfileModal] createProfile failed:', e);
+        return; // 모달 유지 — 재시도 가능
+      }
+    } else {
+      await updateProfile(newProfile);
+    }
+
     closeModal(newProfile);
   });
   box.appendChild(saveBtn);
 
-  // Google 연동 버튼 (미연동 시)
-  if (!isAccountLinked()) {
-    const googleBtn = el('button', `
-      width:100%;padding:12px;background:#4285F4;
-      border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:bold;
-      cursor:pointer;margin-top:10px;display:flex;align-items:center;
-      justify-content:center;gap:8px;
-    `);
-    googleBtn.textContent = 'G  Google로 기록 영구 저장';
-    googleBtn.addEventListener('click', async () => {
-      googleBtn.textContent = '연결 중...';
-      googleBtn.style.opacity = '0.7';
-      const success = await linkGoogleAccount();
-      if (success) {
-        googleBtn.textContent = '연결 완료!';
-        googleBtn.style.background = '#4CAF50';
-        setTimeout(() => googleBtn.remove(), 1500);
-      } else {
-        googleBtn.textContent = 'G  Google로 기록 영구 저장';
-        googleBtn.style.opacity = '1';
-      }
-    });
-    box.appendChild(googleBtn);
-  }
-
   modalElement.appendChild(box);
   document.body.appendChild(modalElement);
 
-  modalElement.addEventListener('click', (e) => {
-    if (e.target === modalElement) closeModal(null);
-  });
+  // 배경 클릭으로 닫기 비활성화 — 반드시 저장 버튼으로만 닫기
 }
 
 function closeModal(result: LocalProfile | null): void {

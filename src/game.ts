@@ -105,6 +105,12 @@ export class Game {
   private hasUsedRevive = false;
   private reviveAvailable = false;
 
+  // Post-game flow state
+  private capturedScore = 0;
+  private capturedHeightMm = 0;
+  private postGameFlowActive = false;
+  private linkingInProgress = false;
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     const ctx = canvas.getContext('2d');
@@ -236,6 +242,10 @@ export class Game {
     clearAchievementPopups();
     this.hasUsedRevive = false;
     this.reviveAvailable = false;
+    this.capturedScore = 0;
+    this.capturedHeightMm = 0;
+    this.postGameFlowActive = false;
+    this.linkingInProgress = false;
     this.lastTime = performance.now();
     this.generateInitialCarrotPool();
     this.generateClouds();
@@ -566,25 +576,117 @@ export class Game {
     this.rankingScrollY = 0;
     this.rankingMaxScroll = 0;
 
-    // async 클로저 전에 값 캡처 (상태 변경에 의한 경합 방지)
-    const capturedScore = this.score;
-    const capturedHeightMm = Math.floor(this.heightReached);
+    // 인스턴스 필드에 캡처 (handleLinkTap 등에서도 접근 가능)
+    this.capturedScore = this.score;
+    this.capturedHeightMm = Math.floor(this.heightReached);
 
-    // 댓글 수집 후 점수 제출 + 랭킹 로드
-    this.collectCommentThenSubmit(capturedHeightMm, capturedScore).catch((e) => {
-      console.warn('[Game] 댓글 수집/점수 제출 실패:', e);
+    // 직렬화된 post-game 흐름: Google 프롬프트 → 닉네임 모달 → 댓글 → 점수 제출
+    this.serializedPostGameFlow().catch((e) => {
+      console.warn('[Game] post-game flow 실패:', e);
     });
+  }
 
-    // 프로필 모달: 완료 후 캐시 무효화 + 랭킹 재로드 (닉네임 반영)
-    if (!localStorage.getItem('bh_profile_set')) {
-      localStorage.setItem('bh_profile_set', '1');
-      showProfileModal().then(() => {
+  private async serializedPostGameFlow(): Promise<void> {
+    if (this.postGameFlowActive) return;
+    this.postGameFlowActive = true;
+
+    try {
+      // [1] Google 프롬프트 (미연동 유저만)
+      if (!isAccountLinked()) {
+        await this.showGooglePrompt();
+      }
+
+      // [2] 닉네임 모달 (프로필 미설정 시만)
+      if (!localStorage.getItem('bh_profile_set')) {
+        await showProfileModal();
         invalidateCache();
-        this.loadRankings();
-      }).catch((e) => {
-        console.warn('[Game] 프로필 모달 표시 실패:', e);
-      });
+      }
+
+      // [3] 댓글 수집 + 점수 제출 (직렬)
+      await this.collectCommentThenSubmit(this.capturedHeightMm, this.capturedScore);
+    } finally {
+      this.postGameFlowActive = false;
     }
+  }
+
+  private showGooglePrompt(): Promise<void> {
+    return new Promise((resolve) => {
+      let resolved = false;
+      const safeResolve = () => {
+        if (resolved) return;
+        resolved = true;
+        overlay.remove();
+        resolve();
+      };
+
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position:fixed;top:0;left:0;width:100%;height:100%;
+        background:rgba(0,0,0,0.75);display:flex;align-items:center;
+        justify-content:center;z-index:9998;font-family:sans-serif;
+        padding:20px;box-sizing:border-box;
+      `;
+
+      const card = document.createElement('div');
+      card.style.cssText = `
+        background:rgba(30,30,50,0.97);border:1px solid rgba(66,133,244,0.5);
+        border-radius:16px;padding:24px 20px;width:100%;max-width:340px;
+        text-align:center;color:#fff;box-sizing:border-box;
+      `;
+
+      const title = document.createElement('div');
+      title.style.cssText = 'font-size:18px;font-weight:bold;margin-bottom:8px;';
+      title.textContent = '기록을 저장하시겠습니까?';
+      card.appendChild(title);
+
+      const desc = document.createElement('div');
+      desc.style.cssText = 'font-size:14px;color:#aaa;margin-bottom:6px;';
+      desc.textContent = 'Google 계정으로 로그인하면 기록이 영구 저장되고 랭킹에 반영됩니다.';
+      card.appendChild(desc);
+
+      const warn = document.createElement('div');
+      warn.style.cssText = 'font-size:12px;color:#FF6B6B;margin-bottom:20px;';
+      warn.textContent = '로그인하지 않으면 기록이 저장되지 않습니다.';
+      card.appendChild(warn);
+
+      const linkBtn = document.createElement('button');
+      linkBtn.style.cssText = `
+        width:100%;padding:14px;background:#4285F4;border:none;border-radius:10px;
+        color:#fff;font-size:16px;font-weight:bold;cursor:pointer;margin-bottom:10px;
+      `;
+      linkBtn.textContent = 'Google로 기록 저장';
+
+      const skipBtn = document.createElement('button');
+      skipBtn.style.cssText = `
+        width:100%;padding:12px;background:transparent;border:1px solid rgba(255,255,255,0.3);
+        border-radius:10px;color:#aaa;font-size:14px;cursor:pointer;
+      `;
+      skipBtn.textContent = '건너뛰기';
+
+      linkBtn.addEventListener('click', async () => {
+        linkBtn.disabled = true;
+        skipBtn.disabled = true;
+        linkBtn.textContent = '연결 중...';
+        linkBtn.style.opacity = '0.7';
+        try {
+          await linkGoogleAccount();
+        } catch (e) {
+          console.warn('[Game] Google link from prompt failed:', e);
+        }
+        safeResolve();
+      });
+
+      skipBtn.addEventListener('click', () => {
+        linkBtn.disabled = true;
+        skipBtn.disabled = true;
+        safeResolve();
+      });
+
+      card.appendChild(linkBtn);
+      card.appendChild(skipBtn);
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+    });
   }
 
   private async collectCommentThenSubmit(heightMm: number, score: number): Promise<void> {
@@ -886,7 +988,8 @@ export class Game {
     const btn = getLinkHitArea(this.w, this.h, this.reviveAvailable);
     if (x >= btn.x && x <= btn.x + btn.width &&
         y >= btn.y && y <= btn.y + btn.height) {
-      linkGoogleAccount().catch((e) => console.warn('[Game] Google 연결 실패:', e));
+      this.performLinkAndSubmit().catch((e) =>
+        console.warn('[Game] link+submit 실패:', e));
       return true;
     }
     return false;
@@ -913,10 +1016,32 @@ export class Game {
     const btn = this.getStartGoogleBtnArea();
     if (x >= btn.x && x <= btn.x + btn.width &&
         y >= btn.y && y <= btn.y + btn.height) {
-      linkGoogleAccount().catch((e) => console.warn('[Game] Google 연결 실패:', e));
+      this.performLinkAndSubmit().catch((e) =>
+        console.warn('[Game] link+submit 실패:', e));
       return true;
     }
     return false;
+  }
+
+  /** Google 연동 후 캡처된 점수 제출 (게임오버 상태일 때만) */
+  private async performLinkAndSubmit(): Promise<void> {
+    if (this.linkingInProgress) return;
+    this.linkingInProgress = true;
+    try {
+      const success = await linkGoogleAccount();
+      if (!success) return;
+
+      // 게임오버 상태에서 캡처된 점수가 있으면 제출
+      if (this.capturedScore > 0 && this.state === GameState.GAME_OVER) {
+        if (!localStorage.getItem('bh_profile_set')) {
+          await showProfileModal();
+          invalidateCache();
+        }
+        await this.collectCommentThenSubmit(this.capturedHeightMm, this.capturedScore);
+      }
+    } finally {
+      this.linkingInProgress = false;
+    }
   }
 
   private renderStartGoogleButton(ctx: CanvasRenderingContext2D): void {

@@ -1,6 +1,6 @@
 import { getSupabase } from './supabase';
 import { Capacitor, registerPlugin } from '@capacitor/core';
-import { flushQueue } from './offline-queue';
+import { flushQueue, clearQueue } from './offline-queue';
 
 // ── 네이티브 Google Sign-In 플러그인 ─────────────────────────
 interface GoogleAuthPlugin {
@@ -72,7 +72,7 @@ export async function initAuth(): Promise<string | null> {
           || (session.user.identities ?? []).some((i: any) => i.provider === 'google')) {
         localStorage.setItem(LINKED_KEY, '1');
       }
-      await ensureProfile();
+      await checkProfileExists();
       flushQueue();
       return supabaseUserId;
     }
@@ -88,7 +88,7 @@ export async function initAuth(): Promise<string | null> {
         if (!signInError && signInData.user) {
           supabaseUserId = signInData.user.id;
           supabaseUserEmail = signInData.user.email ?? null;
-          await ensureProfile();
+          await checkProfileExists();
           flushQueue();
           return supabaseUserId;
         }
@@ -103,7 +103,7 @@ export async function initAuth(): Promise<string | null> {
 
     supabaseUserId = data.user.id;
     supabaseUserEmail = data.user.email ?? null;
-    await ensureProfile();
+    await checkProfileExists();
     flushQueue();
     return supabaseUserId;
   } catch {
@@ -151,8 +151,8 @@ export async function linkGoogleAccount(): Promise<boolean> {
     // 보존한 프로필로 localStorage 복원 (signIn이 초기화할 수 있으므로)
     saveLocalProfile(savedProfile);
 
-    await ensureProfile();
-    flushQueue();
+    await checkProfileExists();
+    clearQueue(); // 익명 점수 큐 삭제 (Google 계정으로 새 시작)
     return true;
   } catch (e: any) {
     if (e?.message?.includes('USER_CANCELED')) return false;
@@ -161,12 +161,13 @@ export async function linkGoogleAccount(): Promise<boolean> {
   }
 }
 
-async function ensureProfile(): Promise<void> {
+/**
+ * CHECK-ONLY: DB 프로필 존재 여부 확인. 존재하면 localStorage에 동기화 + bh_profile_set 설정.
+ * 신규 유저는 false 반환, bh_profile_set 미설정, 프로필 생성 안 함.
+ */
+export async function checkProfileExists(): Promise<boolean> {
   const sb = getSupabase();
-  if (!sb || !supabaseUserId) return;
-
-  const localProfile = getLocalProfile();
-  const localUUID = getLocalUUID();
+  if (!sb || !supabaseUserId) return false;
 
   const { data } = await sb.from('profiles')
     .select('id, nickname, country_code')
@@ -174,31 +175,35 @@ async function ensureProfile(): Promise<void> {
     .single();
 
   if (data) {
-    // DB 프로필이 존재하면 localStorage에 동기화
     const dbProfile: LocalProfile = {
-      nickname: data.nickname ?? localProfile.nickname,
-      country_code: data.country_code ?? localProfile.country_code,
+      nickname: data.nickname ?? getLocalProfile().nickname,
+      country_code: data.country_code ?? getLocalProfile().country_code,
     };
     saveLocalProfile(dbProfile);
     localStorage.setItem('bh_profile_set', '1');
-  } else {
-    // 새 프로필 생성 — 닉네임 중복 체크 후 삽입
-    let nickname = localProfile.nickname;
-    nickname = await resolveUniqueNickname(sb, nickname, supabaseUserId);
-
-    await sb.from('profiles').insert({
-      id: supabaseUserId,
-      nickname,
-      country_code: localProfile.country_code,
-      local_uuid: localUUID,
-    });
-
-    // 중복으로 변경된 닉네임을 localStorage에 반영
-    if (nickname !== localProfile.nickname) {
-      saveLocalProfile({ nickname, country_code: localProfile.country_code });
-    }
-    localStorage.setItem('bh_profile_set', '1');
+    return true;
   }
+  return false; // 신규 유저 — 플래그 미설정, 프로필 미생성
+}
+
+/**
+ * CREATE: 닉네임 모달 저장 후 호출. 중복 체크 + DB insert + bh_profile_set 설정.
+ */
+export async function createProfile(nickname: string, countryCode: string): Promise<void> {
+  const sb = getSupabase();
+  if (!sb || !supabaseUserId) return;
+
+  const resolvedNick = await resolveUniqueNickname(sb, nickname, supabaseUserId);
+
+  await sb.from('profiles').insert({
+    id: supabaseUserId,
+    nickname: resolvedNick,
+    country_code: countryCode,
+    local_uuid: getLocalUUID(),
+  });
+
+  saveLocalProfile({ nickname: resolvedNick, country_code: countryCode });
+  localStorage.setItem('bh_profile_set', '1');
 }
 
 /** 닉네임 중복 시 숫자 접미사를 붙여 유니크한 닉네임 반환 */
@@ -217,7 +222,6 @@ async function resolveUniqueNickname(
 
   if (!data || data.length === 0) return nickname;
 
-  // 중복이면 숫자 접미사 추가 (최대 12자)
   for (let i = 1; i <= 99; i++) {
     const suffix = `${i}`;
     const candidate = nickname.length + suffix.length > 12

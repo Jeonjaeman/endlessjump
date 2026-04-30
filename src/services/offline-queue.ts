@@ -37,6 +37,11 @@ export function enqueueScore(data: ScoreData): void {
   writeQueue(queue);
 }
 
+/** 익명 점수 큐 전체 삭제 (Google 연동 시 사용) */
+export function clearQueue(): void {
+  localStorage.removeItem(QUEUE_KEY);
+}
+
 let flushing = false;
 
 export async function flushQueue(): Promise<void> {
