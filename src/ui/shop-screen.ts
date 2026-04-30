@@ -452,12 +452,12 @@ function renderSkinsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
       const barH = 6;
       const barY = ry + 42;
 
-      const targetM = (unlockInfo.unlockScore / 1000).toFixed(0);
-      const currentM = (unlockInfo.bestHeight / 1000).toFixed(1);
+      const targetMm = unlockInfo.unlockScore.toLocaleString();
+      const currentMm = unlockInfo.bestHeight.toLocaleString();
       ctx.fillStyle = 'rgba(255,255,255,0.5)';
       ctx.font = '10px sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(`${currentM}m / ${targetM}m`, textX, ry + 36);
+      ctx.fillText(`${currentMm}mm / ${targetMm}mm`, textX, ry + 36);
 
       ctx.fillStyle = 'rgba(255,255,255,0.1)';
       ctx.beginPath();
