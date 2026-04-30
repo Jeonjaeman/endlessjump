@@ -332,16 +332,6 @@ export function renderBunny(ctx: CanvasRenderingContext2D, rs: RenderState, x: n
       ctx.translate(x, screenY);
       const lean = clamp(rs.velX * 0.05, -0.3, 0.3);
       ctx.rotate(lean);
-      let scaleX = 1.0;
-      let scaleY = 1.0;
-      if (rs.bunnyPose === BunnyPose.JUMPING) {
-        scaleX = 0.92;
-        scaleY = 1.10;
-      } else if (rs.bunnyPose === BunnyPose.FALLING) {
-        scaleX = 1.10;
-        scaleY = 0.92;
-      }
-      ctx.scale(scaleX, scaleY);
       ctx.fillStyle = 'rgba(0,0,0,0.10)';
       ctx.beginPath();
       ctx.ellipse(2, BUNNY_RADIUS + 6, BUNNY_RADIUS * 0.9, 4, 0, 0, Math.PI * 2);
@@ -367,18 +357,6 @@ export function renderBunny(ctx: CanvasRenderingContext2D, rs: RenderState, x: n
     ctx.translate(x, screenY);
     const lean = clamp(rs.velX * 0.05, -0.3, 0.3);
     ctx.rotate(lean);
-
-    // Pose squash & stretch (lighter for sprites)
-    let scaleX = 1.0;
-    let scaleY = 1.0;
-    if (rs.bunnyPose === BunnyPose.JUMPING) {
-      scaleX = 0.92;
-      scaleY = 1.10;
-    } else if (rs.bunnyPose === BunnyPose.FALLING) {
-      scaleX = 1.10;
-      scaleY = 0.92;
-    }
-    ctx.scale(scaleX, scaleY);
 
     // Shadow
     ctx.fillStyle = 'rgba(0,0,0,0.10)';

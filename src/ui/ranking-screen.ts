@@ -280,14 +280,14 @@ export function renderRankingScreen(
       ctx.fillText(flag3, listX + 30, rowCenterY + 1);
 
       // 스킨 닷
-      drawSkinDot(ctx, listX + 54, rowCenterY - 3, 10, entry.skin_id);
+      drawSkinDot(ctx, listX + 58, rowCenterY - 3, 10, entry.skin_id);
 
       // 프로필 사진
       const photo3 = getProfilePhoto(entry.photo_url);
       if (photo3) {
-        drawCircleImage(ctx, photo3, listX + 78, rowCenterY - 3, 10);
+        drawCircleImage(ctx, photo3, listX + 82, rowCenterY - 3, 10);
       }
-      const nameX3 = photo3 ? listX + 94 : listX + 70;
+      const nameX3 = photo3 ? listX + 98 : listX + 74;
 
       // 구글 계정명
       ctx.font = 'bold 14px sans-serif';
@@ -332,14 +332,14 @@ export function renderRankingScreen(
       ctx.fillText(flagR, listX + 30, rowCenterY2);
 
       // 스킨 닷
-      drawSkinDot(ctx, listX + 52, rowCenterY2 - 4, 9, entry.skin_id);
+      drawSkinDot(ctx, listX + 56, rowCenterY2 - 4, 9, entry.skin_id);
 
       // 프로필 사진
       const photoR = getProfilePhoto(entry.photo_url);
       if (photoR) {
-        drawCircleImage(ctx, photoR, listX + 72, rowCenterY2 - 4, 9);
+        drawCircleImage(ctx, photoR, listX + 78, rowCenterY2 - 4, 9);
       }
-      const nameXR = photoR ? listX + 86 : listX + 66;
+      const nameXR = photoR ? listX + 92 : listX + 70;
 
       // 구글 계정명
       ctx.font = 'bold 13px sans-serif';
@@ -390,14 +390,14 @@ export function renderRankingScreen(
     ctx.fillText(myFlag, listX + 30, myRowCenterY);
 
     // 스킨 닷
-    drawSkinDot(ctx, listX + 52, myRowCenterY - 4, 9, myRank.skin_id);
+    drawSkinDot(ctx, listX + 56, myRowCenterY - 4, 9, myRank.skin_id);
 
     // 프로필 사진
     const myPhoto = getProfilePhoto(myRank.photo_url);
     if (myPhoto) {
-      drawCircleImage(ctx, myPhoto, listX + 72, myRowCenterY - 4, 9);
+      drawCircleImage(ctx, myPhoto, listX + 78, myRowCenterY - 4, 9);
     }
-    const myNameX = myPhoto ? listX + 86 : listX + 66;
+    const myNameX = myPhoto ? listX + 92 : listX + 70;
 
     // 구글 계정명
     ctx.font = 'bold 13px sans-serif';

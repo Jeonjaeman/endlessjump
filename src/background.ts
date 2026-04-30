@@ -15,6 +15,44 @@ const BG_SEQUENCE: BgStep[] = [
   { dayKey: 'sky_space',  nightKey: 'sky_space' },   // 3: 우주
 ];
 
+// ── 스킨별 배경 이미지 로더 ──────────────────────────────────
+const BG_NAMES = ['sky_day', 'sky_sunset', 'sky_night', 'sky_dawn', 'sky_space'] as const;
+
+const skinBgCache = new Map<string, Map<string, HTMLImageElement>>();
+let skinBgLoading = new Set<string>();
+
+function loadSkinBackgrounds(skinId: string): void {
+  if (skinId === 'default' || skinBgCache.has(skinId) || skinBgLoading.has(skinId)) return;
+  skinBgLoading.add(skinId);
+  const map = new Map<string, HTMLImageElement>();
+  let loaded = 0;
+  for (const name of BG_NAMES) {
+    const img = new Image();
+    img.onload = () => {
+      map.set(name, img);
+      loaded++;
+      if (loaded === BG_NAMES.length) {
+        skinBgCache.set(skinId, map);
+        skinBgLoading.delete(skinId);
+      }
+    };
+    img.onerror = () => {
+      loaded++;
+      if (loaded === BG_NAMES.length) {
+        if (map.size > 0) skinBgCache.set(skinId, map);
+        skinBgLoading.delete(skinId);
+      }
+    };
+    img.src = `/assets/backgrounds/${skinId}/${name}.webp`;
+  }
+}
+
+function getSkinBgImage(skinId: string, key: AssetKey): HTMLImageElement | null {
+  if (skinId === 'default') return null;
+  const map = skinBgCache.get(skinId);
+  return map?.get(key) ?? null;
+}
+
 // 각 구간의 높이 경계 (순방향)
 const ZONE_THRESHOLDS = [5000, 12000, 22000, 35000];
 // 역방향 구간 폭
@@ -64,6 +102,15 @@ export class BackgroundRenderer {
   private targetOffsetX = 0;
   private targetOffsetY = 0;
 
+  // 스킨 배경
+  private skinId = 'default';
+
+  setSkin(skinId: string): void {
+    if (this.skinId === skinId) return;
+    this.skinId = skinId;
+    loadSkinBackgrounds(skinId);
+  }
+
   render(
     ctx: CanvasRenderingContext2D, w: number, h: number,
     height: number, elapsed: number, isPlaying: boolean,
@@ -92,8 +139,12 @@ export class BackgroundRenderer {
       this.fadeProgress = 0;
     }
 
-    const currentImg = this.currentKey ? assetManager.get(this.currentKey) : null;
-    const prevImg = this.prevKey ? assetManager.get(this.prevKey) : null;
+    const currentImg = this.currentKey
+      ? (getSkinBgImage(this.skinId, this.currentKey) ?? assetManager.get(this.currentKey))
+      : null;
+    const prevImg = this.prevKey
+      ? (getSkinBgImage(this.skinId, this.prevKey) ?? assetManager.get(this.prevKey))
+      : null;
 
     if (currentImg) {
       if (this.fadeProgress < 1 && prevImg) {
