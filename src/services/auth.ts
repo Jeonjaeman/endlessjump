@@ -120,6 +120,9 @@ export async function linkGoogleAccount(): Promise<boolean> {
   const sb = getSupabase();
   if (!sb) return false;
 
+  // Google 전환 전에 현재 닉네임/프로필 보존
+  const savedProfile = getLocalProfile();
+
   try {
     // 네이티브 Google Sign-In으로 ID 토큰 획득
     if (!Capacitor.isNativePlatform()) {
@@ -142,7 +145,12 @@ export async function linkGoogleAccount(): Promise<boolean> {
     if (error || !data.user) return false;
 
     supabaseUserId = data.user.id;
+    supabaseUserEmail = data.user.email ?? null;
     localStorage.setItem(LINKED_KEY, '1');
+
+    // 보존한 프로필로 localStorage 복원 (signIn이 초기화할 수 있으므로)
+    saveLocalProfile(savedProfile);
+
     await ensureProfile();
     flushQueue();
     return true;
@@ -161,18 +169,71 @@ async function ensureProfile(): Promise<void> {
   const localUUID = getLocalUUID();
 
   const { data } = await sb.from('profiles')
-    .select('id')
+    .select('id, nickname, country_code')
     .eq('id', supabaseUserId)
     .single();
 
-  if (!data) {
+  if (data) {
+    // DB 프로필이 존재하면 localStorage에 동기화
+    const dbProfile: LocalProfile = {
+      nickname: data.nickname ?? localProfile.nickname,
+      country_code: data.country_code ?? localProfile.country_code,
+    };
+    saveLocalProfile(dbProfile);
+    localStorage.setItem('bh_profile_set', '1');
+  } else {
+    // 새 프로필 생성 — 닉네임 중복 체크 후 삽입
+    let nickname = localProfile.nickname;
+    nickname = await resolveUniqueNickname(sb, nickname, supabaseUserId);
+
     await sb.from('profiles').insert({
       id: supabaseUserId,
-      nickname: localProfile.nickname,
+      nickname,
       country_code: localProfile.country_code,
       local_uuid: localUUID,
     });
+
+    // 중복으로 변경된 닉네임을 localStorage에 반영
+    if (nickname !== localProfile.nickname) {
+      saveLocalProfile({ nickname, country_code: localProfile.country_code });
+    }
+    localStorage.setItem('bh_profile_set', '1');
   }
+}
+
+/** 닉네임 중복 시 숫자 접미사를 붙여 유니크한 닉네임 반환 */
+async function resolveUniqueNickname(
+  sb: ReturnType<typeof getSupabase>,
+  nickname: string,
+  userId: string,
+): Promise<string> {
+  if (!sb) return nickname;
+
+  const { data } = await sb.from('profiles')
+    .select('id')
+    .ilike('nickname', nickname)
+    .neq('id', userId)
+    .limit(1);
+
+  if (!data || data.length === 0) return nickname;
+
+  // 중복이면 숫자 접미사 추가 (최대 12자)
+  for (let i = 1; i <= 99; i++) {
+    const suffix = `${i}`;
+    const candidate = nickname.length + suffix.length > 12
+      ? nickname.slice(0, 12 - suffix.length) + suffix
+      : nickname + suffix;
+
+    const { data: dup } = await sb.from('profiles')
+      .select('id')
+      .ilike('nickname', candidate)
+      .neq('id', userId)
+      .limit(1);
+
+    if (!dup || dup.length === 0) return candidate;
+  }
+
+  return nickname + Math.floor(Math.random() * 1000);
 }
 
 export async function updateProfile(profile: LocalProfile): Promise<void> {
