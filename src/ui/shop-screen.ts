@@ -10,6 +10,7 @@
 import { getProducts, purchaseProduct, restorePurchases, isProductPurchased, isAdsRemoved } from '../services/iap-service';
 import { getSkins, selectSkin, getSelectedSkinId, getSkinUnlockInfo, getSkinSpriteDir } from '../services/skin-service';
 import { getAchievements } from '../services/achievement-service';
+import { showBanner, hideBanner } from '../services/ad-service';
 import { skinAssetLoader } from '../skin-assets';
 import { assetManager } from '../assets';
 import type { BunnySkin, Achievement } from '../types';
@@ -57,10 +58,14 @@ export function openShop(): void {
     .filter(s => s.spriteDir)
     .map(s => ({ id: s.id, spriteDir: s.spriteDir! }));
   skinAssetLoader.loadAllThumbs(skinDirs).catch(() => {});
+
+  // 배너 광고 표시
+  showBanner();
 }
 
 export function closeShop(): void {
   shopOpen = false;
+  hideBanner();
 }
 
 // ── 히트 영역 ───────────────────────────────────────────────

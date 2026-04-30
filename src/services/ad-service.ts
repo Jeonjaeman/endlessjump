@@ -1,5 +1,5 @@
 /**
- * AdMob 광고 서비스 (전면 + 리워드만, 배너 없음)
+ * AdMob 광고 서비스 (배너 + 리워드)
  */
 
 import { Capacitor } from '@capacitor/core';
@@ -7,21 +7,25 @@ import { Capacitor } from '@capacitor/core';
 const isNative = Capacitor.isNativePlatform();
 
 // -- AdMob Ad IDs --
-const INTERSTITIAL_ID = 'ca-app-pub-7981513411030364/7579597996';
+const BANNER_ID = 'ca-app-pub-7981513411030364/4476498218';
 const REWARD_ID = 'ca-app-pub-7981513411030364/9888712896';
 
 // -- Dynamic import --
 let AdMobPlugin: any = null;
-let InterstitialAdEvents: any = null;
+let BannerAdEvents: any = null;
 let RewardAdEvents: any = null;
+let BannerAdSizeEnum: any = null;
+let BannerAdPositionEnum: any = null;
 
 async function loadAdMobPlugin(): Promise<boolean> {
   if (!isNative) return false;
   try {
     const mod = await import('@capacitor-community/admob');
     AdMobPlugin = mod.AdMob;
-    InterstitialAdEvents = mod.InterstitialAdPluginEvents;
+    BannerAdEvents = mod.BannerAdPluginEvents;
     RewardAdEvents = mod.RewardAdPluginEvents;
+    BannerAdSizeEnum = mod.BannerAdSize;
+    BannerAdPositionEnum = mod.BannerAdPosition;
     return true;
   } catch {
     console.warn('[AdService] AdMob 플러그인 로드 실패');
@@ -31,10 +35,8 @@ async function loadAdMobPlugin(): Promise<boolean> {
 
 // -- State --
 let initialized = false;
-let interstitialReady = false;
 let rewardedReady = false;
-let gameOverCount = 0;
-const INTERSTITIAL_INTERVAL = 3;
+let bannerShowing = false;
 
 // -- Initialization --
 export async function initAds(): Promise<void> {
@@ -49,7 +51,6 @@ export async function initAds(): Promise<void> {
     });
     initialized = true;
     setupEventListeners();
-    preloadInterstitial();
     preloadRewarded();
   } catch (e) {
     console.warn('[AdService] AdMob 초기화 실패:', e);
@@ -57,42 +58,35 @@ export async function initAds(): Promise<void> {
 }
 
 function setupEventListeners(): void {
-  if (!AdMobPlugin || !InterstitialAdEvents || !RewardAdEvents) return;
+  if (!AdMobPlugin || !RewardAdEvents) return;
 
-  AdMobPlugin.addListener(InterstitialAdEvents.Loaded, () => { interstitialReady = true; });
-  AdMobPlugin.addListener(InterstitialAdEvents.FailedToLoad, () => { interstitialReady = false; });
   AdMobPlugin.addListener(RewardAdEvents.Loaded, () => { rewardedReady = true; });
   AdMobPlugin.addListener(RewardAdEvents.FailedToLoad, () => { rewardedReady = false; });
 }
 
-// -- Banner (비활성) --
-export async function showBanner(): Promise<void> { /* 배너 미사용 */ }
-export async function hideBanner(): Promise<void> { /* 배너 미사용 */ }
-
-// -- Interstitial --
-async function preloadInterstitial(): Promise<void> {
-  if (!initialized || !AdMobPlugin) return;
+// -- Banner (상점 화면 전용) --
+export async function showBanner(): Promise<void> {
+  if (!initialized || !AdMobPlugin || bannerShowing || adsRemoved) return;
   try {
-    await AdMobPlugin.prepareInterstitial({ adId: INTERSTITIAL_ID });
-  } catch {
-    interstitialReady = false;
+    await AdMobPlugin.showBanner({
+      adId: BANNER_ID,
+      adSize: BannerAdSizeEnum?.BANNER ?? 'BANNER',
+      position: BannerAdPositionEnum?.BOTTOM_CENTER ?? 'BOTTOM_CENTER',
+      margin: 0,
+    });
+    bannerShowing = true;
+  } catch (e) {
+    console.warn('[AdService] 배너 표시 실패:', e);
   }
 }
 
-export async function showInterstitialOnGameOver(): Promise<boolean> {
-  gameOverCount++;
-  if (gameOverCount % INTERSTITIAL_INTERVAL !== 0) return false;
-  if (!initialized || !interstitialReady || !AdMobPlugin) return false;
-
+export async function hideBanner(): Promise<void> {
+  if (!initialized || !AdMobPlugin || !bannerShowing) return;
   try {
-    await AdMobPlugin.showInterstitial();
-    interstitialReady = false;
-    preloadInterstitial();
-    return true;
+    await AdMobPlugin.hideBanner();
+    bannerShowing = false;
   } catch {
-    interstitialReady = false;
-    preloadInterstitial();
-    return false;
+    bannerShowing = false;
   }
 }
 

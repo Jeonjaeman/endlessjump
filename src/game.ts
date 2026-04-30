@@ -5,7 +5,7 @@ import { submitScore } from './services/score';
 import { fetchRanking, invalidateCache } from './services/leaderboard';
 import { renderRankingScreen, getTabHitArea, getReviveHitArea, getLinkHitArea, getRankingMaxScroll } from './ui/ranking-screen';
 import { showProfileModal } from './ui/profile-modal';
-import { initAds, showBanner, hideBanner, showInterstitialOnGameOver, isRewardedReady, showRewardedAd, areAdsRemoved } from './services/ad-service';
+import { initAds, isRewardedReady, showRewardedAd, areAdsRemoved } from './services/ad-service';
 import { initIAP } from './services/iap-service';
 import { initSkins, getCurrentSkinColors, getSelectedSkinId } from './services/skin-service';
 import { skinAssetLoader } from './skin-assets';
@@ -125,7 +125,6 @@ export class Game {
         this.bg.setSkin(getSelectedSkinId());
         this.audio.setBGM(getSelectedSkinId());
         this.audio.startBGM();
-        if (!areAdsRemoved()) showBanner();
       },
       onStartTap: (x: number, y: number) => {
         // 튜토리얼 활성 중이면 다음 단계로
@@ -143,7 +142,6 @@ export class Game {
         this.bg.setSkin(getSelectedSkinId());
         this.audio.setBGM(getSelectedSkinId());
         this.audio.startBGM();
-        if (!areAdsRemoved()) showBanner();
       },
       onGameOverTap: (x: number, y: number) => {
         if (this.handleShopButtonTap(x, y)) return;
@@ -550,8 +548,6 @@ export class Game {
     this.saveBest();
     this.audio.playGameOverSound();
     this.audio.stopBGM();
-    hideBanner();
-
     // 업적 체크
     achOnGameOver(this.score, Math.floor(this.heightReached));
     // 달성된 업적 팝업 큐
@@ -562,9 +558,6 @@ export class Game {
 
     // 부활 가능 여부: 이번 게임에서 아직 부활 안 했고, (리워드 광고 준비됨 또는 광고 제거 구매자)
     this.reviveAvailable = !this.hasUsedRevive && (isRewardedReady() || areAdsRemoved());
-
-    // 전면 광고 표시 (N회 게임 오버마다, 광고 제거 시 스킵)
-    if (!areAdsRemoved()) showInterstitialOnGameOver();
 
     // 랭킹 UI 초기화 (이전 게임 데이터 잔상 방지)
     this.rankings = [];
