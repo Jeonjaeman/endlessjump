@@ -55,6 +55,7 @@ export interface RankEntry {
   is_me: boolean;
   comment?: string;
   skin_id?: string;
+  photo_url?: string;
 }
 
 // -- Phase 5: IAP / Skin / Achievement --

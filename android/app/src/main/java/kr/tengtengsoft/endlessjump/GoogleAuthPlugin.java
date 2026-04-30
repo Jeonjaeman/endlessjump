@@ -63,6 +63,8 @@ public class GoogleAuthPlugin extends Plugin {
             ret.put("idToken", idToken);
             ret.put("email", account.getEmail());
             ret.put("displayName", account.getDisplayName());
+            ret.put("photoUrl", account.getPhotoUrl() != null ? account.getPhotoUrl().toString() : null);
+            ret.put("countryCode", java.util.Locale.getDefault().getCountry());
             call.resolve(ret);
         } catch (ApiException e) {
             Log.w(TAG, "Google sign in failed: " + e.getStatusCode());

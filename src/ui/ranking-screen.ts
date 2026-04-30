@@ -1,16 +1,54 @@
 import type { RankEntry } from '../types';
 import { getFlagEmoji } from './profile-modal';
 import { isAccountLinked } from '../services/auth';
-import { getSkinBodyColorById } from '../services/skin-service';
+import { getSkinBodyColorById, getSkinSpriteDir, getSkins } from '../services/skin-service';
+import { skinAssetLoader } from '../skin-assets';
+import { assetManager } from '../assets';
 
 const MEDAL_EMOJIS = ['\u{1F451}', '\u{1F948}', '\u{1F949}'];
 const MEDAL_BG = ['#FFD700', '#D0D0E0', '#E8A860'];
 const MEDAL_SHADOW = ['#CC9900', '#8888AA', '#B07030'];
 
-const ROW_H = 34;
-const COMMENT_H = 16;
+const ROW_H = 46;
+const COMMENT_H = 22;
 const ROW_GAP = 6;
-const LIST_CLIP_H = 290;
+const LIST_CLIP_H = 360;
+
+// ── 프로필 사진 캐시 ──────────────────────────────────────────
+const photoCache = new Map<string, HTMLImageElement | null>();
+
+function getProfilePhoto(url: string | undefined): HTMLImageElement | null {
+  if (!url) return null;
+  const cached = photoCache.get(url);
+  if (cached !== undefined) return cached;
+
+  // 로딩 시작
+  photoCache.set(url, null);
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => photoCache.set(url, img);
+  img.onerror = () => photoCache.set(url, null);
+  img.src = url;
+  return null;
+}
+
+function drawCircleImage(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement, cx: number, cy: number, radius: number,
+): void {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.clip();
+  const size = radius * 2;
+  ctx.drawImage(img, cx - radius, cy - radius, size, size);
+  ctx.restore();
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
 
 // ── Neobrutalism 유틸 ──────────────────────────────────────────
 
@@ -52,19 +90,69 @@ function drawNeoButton(
   ctx.fillText(label, x + w / 2, y + h / 2 + 5);
 }
 
+// 썸네일 프리로드 (최초 1회)
+let _thumbsQueued = false;
+function ensureThumbsLoaded(): void {
+  if (_thumbsQueued) return;
+  _thumbsQueued = true;
+  const dirs = getSkins()
+    .filter(s => s.spriteDir)
+    .map(s => ({ id: s.id, spriteDir: s.spriteDir! }));
+  skinAssetLoader.loadAllThumbs(dirs).catch(() => {});
+}
+
 function drawSkinDot(
   ctx: CanvasRenderingContext2D,
   cx: number, cy: number, radius: number,
   skinId: string | undefined,
 ): void {
-  const color = getSkinBodyColorById(skinId ?? 'default');
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-  ctx.fillStyle = color;
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
+  const id = skinId ?? 'default';
+  const thumb = skinAssetLoader.getThumb(id);
+
+  if (thumb) {
+    // 원형 클리핑으로 썸네일 이미지 렌더
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.clip();
+    const size = radius * 2;
+    ctx.drawImage(thumb, cx - radius, cy - radius, size, size);
+    ctx.restore();
+
+    // 테두리
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  } else {
+    // 폴백: 기본 bunny_idle 스프라이트 또는 색상 원
+    const defaultImg = assetManager.has('bunny_idle') ? assetManager.get('bunny_idle') : null;
+    if (defaultImg) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.clip();
+      const size = radius * 2;
+      ctx.drawImage(defaultImg, cx - radius, cy - radius, size, size);
+      ctx.restore();
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    } else {
+      const color = getSkinBodyColorById(id);
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
 }
 
 // ── 랭킹 TOP 10 진입 여부 체크 (댓글 팝업용) ───────────────────
@@ -104,6 +192,8 @@ export function renderRankingScreen(
   reviveAvailable: boolean = false,
   scrollY: number = 0,
 ): void {
+  ensureThumbsLoaded();
+
   ctx.fillStyle = 'rgba(0,0,0,0.65)';
   ctx.fillRect(0, 0, w, h);
 
@@ -177,64 +267,97 @@ export function renderRankingScreen(
       // TOP 3: Neobrutalism medal card
       drawNeoRect(ctx, listX, curY - 6, listW, thisRowH + 4, 8, MEDAL_BG[medalIdx], 3);
 
+      const rowCenterY = curY + 16;
+
       // 메달 이모지
-      ctx.font = '14px sans-serif';
+      ctx.font = '16px sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(MEDAL_EMOJIS[medalIdx], listX + 8, curY + 12);
+      ctx.fillText(MEDAL_EMOJIS[medalIdx], listX + 8, rowCenterY + 1);
+
+      // 국가
+      const flag3 = getFlagEmoji(entry.country_code);
+      ctx.font = '14px sans-serif';
+      ctx.fillText(flag3, listX + 30, rowCenterY + 1);
 
       // 스킨 닷
-      drawSkinDot(ctx, listX + 34, curY + 8, 6, entry.skin_id);
+      drawSkinDot(ctx, listX + 54, rowCenterY - 3, 10, entry.skin_id);
 
-      // 닉네임 (간격 넓힘)
-      ctx.font = 'bold 13px sans-serif';
+      // 프로필 사진
+      const photo3 = getProfilePhoto(entry.photo_url);
+      if (photo3) {
+        drawCircleImage(ctx, photo3, listX + 78, rowCenterY - 3, 10);
+      }
+      const nameX3 = photo3 ? listX + 94 : listX + 70;
+
+      // 구글 계정명
+      ctx.font = 'bold 14px sans-serif';
       ctx.fillStyle = entry.is_me ? '#FF6B35' : '#1a1a2e';
-      const flag = getFlagEmoji(entry.country_code);
-      ctx.fillText(`${flag} ${entry.nickname}`, listX + 46, curY + 12);
+      ctx.textAlign = 'left';
+      ctx.fillText(entry.nickname, nameX3, rowCenterY + 1);
 
       // 높이
       ctx.textAlign = 'right';
       ctx.fillStyle = '#1a1a2e';
-      ctx.font = 'bold 13px sans-serif';
-      ctx.fillText(`${entry.height}mm`, listX + listW - 10, curY + 12);
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText(`${entry.height}mm`, listX + listW - 10, rowCenterY + 1);
 
       // 댓글
       if (hasComment) {
         ctx.textAlign = 'left';
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.font = 'italic 10px sans-serif';
-        const truncated = entry.comment!.length > 36 ? entry.comment!.slice(0, 36) + '\u2026' : entry.comment!;
-        ctx.fillText('\uD83D\uDCAC ' + truncated, listX + 10, curY + ROW_H + 2);
+        ctx.font = 'italic 12px sans-serif';
+        const truncated = entry.comment!.length > 30 ? entry.comment!.slice(0, 30) + '\u2026' : entry.comment!;
+        ctx.fillText('\uD83D\uDCAC ' + truncated, listX + 12, curY + ROW_H + 2);
       }
 
     } else {
       // 4위 이하
       if (entry.is_me) {
         drawNeoRect(ctx, listX, curY - 6, listW, thisRowH + 4, 6, 'rgba(255,107,53,0.85)', 2);
+      } else {
+        drawNeoRect(ctx, listX, curY - 6, listW, thisRowH + 4, 6, 'rgba(30,30,50,0.75)', 2);
       }
 
+      const rowCenterY2 = curY + 16;
+
       ctx.textAlign = 'left';
-      ctx.fillStyle = entry.is_me ? '#FFF' : 'rgba(255,255,255,0.5)';
-      ctx.font = '12px sans-serif';
-      ctx.fillText(`${entry.rank}`, listX + 8, curY + 11);
+      ctx.fillStyle = entry.is_me ? '#FFF' : 'rgba(255,255,255,0.7)';
+      ctx.font = 'bold 14px sans-serif';
+      const rankText = `${entry.rank}`;
+      ctx.fillText(rankText, listX + 8, rowCenterY2);
 
-      drawSkinDot(ctx, listX + 34, curY + 7, 5, entry.skin_id);
+      // 국가
+      const flagR = getFlagEmoji(entry.country_code);
+      ctx.font = '13px sans-serif';
+      ctx.fillText(flagR, listX + 30, rowCenterY2);
 
-      ctx.font = '12px sans-serif';
-      ctx.fillStyle = entry.is_me ? '#FFF' : 'rgba(255,255,255,0.9)';
-      const flag = getFlagEmoji(entry.country_code);
-      ctx.fillText(`${flag} ${entry.nickname}`, listX + 46, curY + 11);
+      // 스킨 닷
+      drawSkinDot(ctx, listX + 52, rowCenterY2 - 4, 9, entry.skin_id);
+
+      // 프로필 사진
+      const photoR = getProfilePhoto(entry.photo_url);
+      if (photoR) {
+        drawCircleImage(ctx, photoR, listX + 72, rowCenterY2 - 4, 9);
+      }
+      const nameXR = photoR ? listX + 86 : listX + 66;
+
+      // 구글 계정명
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillStyle = entry.is_me ? '#FFF' : '#FFFFFF';
+      ctx.textAlign = 'left';
+      ctx.fillText(entry.nickname, nameXR, rowCenterY2);
 
       ctx.textAlign = 'right';
-      ctx.fillStyle = entry.is_me ? '#FFD700' : 'rgba(255,255,255,0.7)';
-      ctx.font = '12px sans-serif';
-      ctx.fillText(`${entry.height}mm`, listX + listW - 10, curY + 11);
+      ctx.fillStyle = entry.is_me ? '#FFD700' : 'rgba(255,255,255,0.85)';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText(`${entry.height}mm`, listX + listW - 10, rowCenterY2);
 
       if (hasComment) {
         ctx.textAlign = 'left';
         ctx.fillStyle = 'rgba(255,255,255,0.45)';
-        ctx.font = 'italic 10px sans-serif';
-        const truncated = entry.comment!.length > 36 ? entry.comment!.slice(0, 36) + '\u2026' : entry.comment!;
-        ctx.fillText('\uD83D\uDCAC ' + truncated, listX + 10, curY + ROW_H);
+        ctx.font = 'italic 12px sans-serif';
+        const truncated = entry.comment!.length > 30 ? entry.comment!.slice(0, 30) + '\u2026' : entry.comment!;
+        ctx.fillText('\uD83D\uDCAC ' + truncated, listX + 12, curY + ROW_H);
       }
     }
 
@@ -253,26 +376,46 @@ export function renderRankingScreen(
 
     drawNeoRect(ctx, listX, curY - 6, listW, thisRowH + 4, 6, 'rgba(255,107,53,0.85)', 2);
 
+    const myRowCenterY = curY + 16;
+
     ctx.textAlign = 'left';
     ctx.fillStyle = '#FFF';
+    ctx.font = 'bold 14px sans-serif';
+    const myRankText = `${myRank.rank}`;
+    ctx.fillText(myRankText, listX + 8, myRowCenterY);
+
+    // 국가
+    const myFlag = getFlagEmoji(myRank.country_code);
+    ctx.font = '13px sans-serif';
+    ctx.fillText(myFlag, listX + 30, myRowCenterY);
+
+    // 스킨 닷
+    drawSkinDot(ctx, listX + 52, myRowCenterY - 4, 9, myRank.skin_id);
+
+    // 프로필 사진
+    const myPhoto = getProfilePhoto(myRank.photo_url);
+    if (myPhoto) {
+      drawCircleImage(ctx, myPhoto, listX + 72, myRowCenterY - 4, 9);
+    }
+    const myNameX = myPhoto ? listX + 86 : listX + 66;
+
+    // 구글 계정명
     ctx.font = 'bold 13px sans-serif';
-    ctx.fillText(`${myRank.rank}`, listX + 8, curY + 11);
-
-    drawSkinDot(ctx, listX + 34, curY + 7, 5, myRank.skin_id);
-
-    const flag = getFlagEmoji(myRank.country_code);
-    ctx.fillText(`${flag} ${myRank.nickname}`, listX + 46, curY + 11);
+    ctx.fillStyle = '#FFF';
+    ctx.textAlign = 'left';
+    ctx.fillText(myRank.nickname, myNameX, myRowCenterY);
 
     ctx.textAlign = 'right';
     ctx.fillStyle = '#FFD700';
-    ctx.fillText(`${myRank.height}mm`, listX + listW - 10, curY + 11);
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillText(`${myRank.height}mm`, listX + listW - 10, myRowCenterY);
 
     if (hasComment) {
       ctx.textAlign = 'left';
       ctx.fillStyle = 'rgba(255,255,255,0.55)';
-      ctx.font = 'italic 10px sans-serif';
-      const truncated = myRank.comment!.length > 36 ? myRank.comment!.slice(0, 36) + '\u2026' : myRank.comment!;
-      ctx.fillText('\uD83D\uDCAC ' + truncated, listX + 10, curY + ROW_H);
+      ctx.font = 'italic 12px sans-serif';
+      const truncated = myRank.comment!.length > 30 ? myRank.comment!.slice(0, 30) + '\u2026' : myRank.comment!;
+      ctx.fillText('\uD83D\uDCAC ' + truncated, listX + 12, curY + ROW_H);
     }
   }
 

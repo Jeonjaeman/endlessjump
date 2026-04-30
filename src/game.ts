@@ -1,11 +1,11 @@
 import { GameState, CarrotType, BunnyPose, type Carrot, type Particle, type Cloud, type ScorePopup, type RankEntry } from './types';
 import { AudioManager } from './audio';
 import { initAuth, getLocalUUID, isAccountLinked, linkGoogleAccount } from './services/auth';
+// profile-modal 제거됨 — Google 계정 정보로 자동 프로필 생성
 import { submitScore } from './services/score';
 import { fetchRanking, invalidateCache } from './services/leaderboard';
 import { renderRankingScreen, getTabHitArea, getReviveHitArea, getLinkHitArea, getRankingMaxScroll } from './ui/ranking-screen';
-import { showProfileModal } from './ui/profile-modal';
-import { initAds, showBanner, hideBanner, isRewardedReady, showRewardedAd, areAdsRemoved } from './services/ad-service';
+import { initAds, showBanner, hideBanner, showInterstitialOnGameOver, isRewardedReady, showRewardedAd, areAdsRemoved } from './services/ad-service';
 import { initIAP } from './services/iap-service';
 import { initSkins, getCurrentSkinColors, getSelectedSkinId } from './services/skin-service';
 import { skinAssetLoader } from './skin-assets';
@@ -559,6 +559,7 @@ export class Game {
   private gameOver(): void {
     this.state = GameState.GAME_OVER;
     showBanner();
+    showInterstitialOnGameOver();
     this.saveBest();
     this.audio.playGameOverSound();
     this.audio.stopBGM();
@@ -600,13 +601,7 @@ export class Game {
         await this.showGooglePrompt();
       }
 
-      // [2] 닉네임 모달 (Google 연동 완료 + 프로필 미설정 시만)
-      if (isAccountLinked() && !localStorage.getItem('bh_profile_set')) {
-        await showProfileModal();
-        invalidateCache();
-      }
-
-      // [3] 댓글 수집 + 점수 제출 (연동된 유저만)
+      // [2] 댓글 수집 + 점수 제출 (연동된 유저만)
       if (isAccountLinked()) {
         await this.collectCommentThenSubmit(this.capturedHeightMm, this.capturedScore);
       } else {
@@ -1043,10 +1038,6 @@ export class Game {
 
       // 게임오버 상태에서 캡처된 점수가 있으면 제출
       if (this.capturedScore > 0 && this.state === GameState.GAME_OVER) {
-        if (!localStorage.getItem('bh_profile_set')) {
-          await showProfileModal();
-          invalidateCache();
-        }
         await this.collectCommentThenSubmit(this.capturedHeightMm, this.capturedScore);
       }
     } finally {

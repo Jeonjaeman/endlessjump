@@ -4,7 +4,13 @@ import { flushQueue, clearQueue } from './offline-queue';
 
 // ── 네이티브 Google Sign-In 플러그인 ─────────────────────────
 interface GoogleAuthPlugin {
-  signIn(opts: { webClientId: string }): Promise<{ idToken: string; email: string; displayName: string }>;
+  signIn(opts: { webClientId: string }): Promise<{
+    idToken: string;
+    email: string;
+    displayName: string;
+    photoUrl: string | null;
+    countryCode: string;
+  }>;
 }
 
 const GoogleAuth = registerPlugin<GoogleAuthPlugin>('GoogleAuth');
@@ -19,6 +25,7 @@ const LINKED_KEY = 'bh_account_linked';
 export interface LocalProfile {
   nickname: string;
   country_code: string;
+  photo_url?: string;
 }
 
 function generateUUID(): string {
@@ -72,7 +79,7 @@ export async function initAuth(): Promise<string | null> {
           || (session.user.identities ?? []).some((i: any) => i.provider === 'google')) {
         localStorage.setItem(LINKED_KEY, '1');
       }
-      await checkProfileExists();
+      await syncProfileFromDB();
       flushQueue();
       return supabaseUserId;
     }
@@ -80,15 +87,16 @@ export async function initAuth(): Promise<string | null> {
     // 이전에 Google 연결했으면 세션이 만료된 경우만 재로그인 시도
     if (localStorage.getItem(LINKED_KEY) === '1' && Capacitor.isNativePlatform()) {
       try {
-        const { idToken } = await GoogleAuth.signIn({ webClientId: GOOGLE_WEB_CLIENT_ID });
+        const googleResult = await GoogleAuth.signIn({ webClientId: GOOGLE_WEB_CLIENT_ID });
         const { data: signInData, error: signInError } = await sb.auth.signInWithIdToken({
           provider: 'google',
-          token: idToken,
+          token: googleResult.idToken,
         });
         if (!signInError && signInData.user) {
           supabaseUserId = signInData.user.id;
           supabaseUserEmail = signInData.user.email ?? null;
-          await checkProfileExists();
+          // 재로그인 시에도 Google 정보 업데이트
+          await upsertGoogleProfile(googleResult.displayName, googleResult.countryCode, googleResult.photoUrl);
           flushQueue();
           return supabaseUserId;
         }
@@ -103,7 +111,7 @@ export async function initAuth(): Promise<string | null> {
 
     supabaseUserId = data.user.id;
     supabaseUserEmail = data.user.email ?? null;
-    await checkProfileExists();
+    await syncProfileFromDB();
     flushQueue();
     return supabaseUserId;
   } catch {
@@ -120,13 +128,9 @@ export async function linkGoogleAccount(): Promise<boolean> {
   const sb = getSupabase();
   if (!sb) return false;
 
-  // Google 전환 전에 현재 닉네임/프로필 보존
-  const savedProfile = getLocalProfile();
-
   try {
     // 네이티브 Google Sign-In으로 ID 토큰 획득
     if (!Capacitor.isNativePlatform()) {
-      // 웹 폴백: redirect 방식
       const { data, error } = await sb.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo: window.location.origin },
@@ -134,12 +138,12 @@ export async function linkGoogleAccount(): Promise<boolean> {
       return !error && !!data;
     }
 
-    const { idToken } = await GoogleAuth.signIn({ webClientId: GOOGLE_WEB_CLIENT_ID });
+    const googleResult = await GoogleAuth.signIn({ webClientId: GOOGLE_WEB_CLIENT_ID });
 
     // Supabase에 ID 토큰으로 로그인
     const { data, error } = await sb.auth.signInWithIdToken({
       provider: 'google',
-      token: idToken,
+      token: googleResult.idToken,
     });
 
     if (error || !data.user) return false;
@@ -148,11 +152,9 @@ export async function linkGoogleAccount(): Promise<boolean> {
     supabaseUserEmail = data.user.email ?? null;
     localStorage.setItem(LINKED_KEY, '1');
 
-    // 보존한 프로필로 localStorage 복원 (signIn이 초기화할 수 있으므로)
-    saveLocalProfile(savedProfile);
-
-    await checkProfileExists();
-    clearQueue(); // 익명 점수 큐 삭제 (Google 계정으로 새 시작)
+    // Google 계정 정보로 프로필 자동 생성/업데이트
+    await upsertGoogleProfile(googleResult.displayName, googleResult.countryCode, googleResult.photoUrl);
+    clearQueue(); // 익명 점수 큐 삭제
     return true;
   } catch (e: any) {
     if (e?.message?.includes('USER_CANCELED')) return false;
@@ -162,15 +164,53 @@ export async function linkGoogleAccount(): Promise<boolean> {
 }
 
 /**
- * CHECK-ONLY: DB 프로필 존재 여부 확인. 존재하면 localStorage에 동기화 + bh_profile_set 설정.
- * 신규 유저는 false 반환, bh_profile_set 미설정, 프로필 생성 안 함.
+ * Google 계정 정보로 프로필 생성 또는 업데이트 (닉네임 = displayName, 국가 = 기기 로케일)
  */
-export async function checkProfileExists(): Promise<boolean> {
+async function upsertGoogleProfile(displayName: string, countryCode: string, photoUrl: string | null): Promise<void> {
   const sb = getSupabase();
-  if (!sb || !supabaseUserId) return false;
+  if (!sb || !supabaseUserId) return;
+
+  const profile: LocalProfile = {
+    nickname: displayName || 'Player',
+    country_code: countryCode || 'KR',
+    photo_url: photoUrl ?? undefined,
+  };
+  saveLocalProfile(profile);
+  localStorage.setItem('bh_profile_set', '1');
 
   const { data } = await sb.from('profiles')
-    .select('id, nickname, country_code')
+    .select('id')
+    .eq('id', supabaseUserId)
+    .single();
+
+  if (data) {
+    // 기존 프로필 업데이트
+    await sb.from('profiles').update({
+      nickname: profile.nickname,
+      country_code: profile.country_code,
+      photo_url: profile.photo_url ?? null,
+    }).eq('id', supabaseUserId);
+  } else {
+    // 새 프로필 생성
+    await sb.from('profiles').insert({
+      id: supabaseUserId,
+      nickname: profile.nickname,
+      country_code: profile.country_code,
+      photo_url: profile.photo_url ?? null,
+      local_uuid: getLocalUUID(),
+    });
+  }
+}
+
+/**
+ * DB 프로필 존재 시 localStorage에 동기화
+ */
+async function syncProfileFromDB(): Promise<void> {
+  const sb = getSupabase();
+  if (!sb || !supabaseUserId) return;
+
+  const { data } = await sb.from('profiles')
+    .select('id, nickname, country_code, photo_url')
     .eq('id', supabaseUserId)
     .single();
 
@@ -178,76 +218,9 @@ export async function checkProfileExists(): Promise<boolean> {
     const dbProfile: LocalProfile = {
       nickname: data.nickname ?? getLocalProfile().nickname,
       country_code: data.country_code ?? getLocalProfile().country_code,
+      photo_url: data.photo_url ?? undefined,
     };
     saveLocalProfile(dbProfile);
     localStorage.setItem('bh_profile_set', '1');
-    return true;
   }
-  return false; // 신규 유저 — 플래그 미설정, 프로필 미생성
-}
-
-/**
- * CREATE: 닉네임 모달 저장 후 호출. 중복 체크 + DB insert + bh_profile_set 설정.
- */
-export async function createProfile(nickname: string, countryCode: string): Promise<void> {
-  const sb = getSupabase();
-  if (!sb || !supabaseUserId) return;
-
-  const resolvedNick = await resolveUniqueNickname(sb, nickname, supabaseUserId);
-
-  await sb.from('profiles').insert({
-    id: supabaseUserId,
-    nickname: resolvedNick,
-    country_code: countryCode,
-    local_uuid: getLocalUUID(),
-  });
-
-  saveLocalProfile({ nickname: resolvedNick, country_code: countryCode });
-  localStorage.setItem('bh_profile_set', '1');
-}
-
-/** 닉네임 중복 시 숫자 접미사를 붙여 유니크한 닉네임 반환 */
-async function resolveUniqueNickname(
-  sb: ReturnType<typeof getSupabase>,
-  nickname: string,
-  userId: string,
-): Promise<string> {
-  if (!sb) return nickname;
-
-  const { data } = await sb.from('profiles')
-    .select('id')
-    .ilike('nickname', nickname)
-    .neq('id', userId)
-    .limit(1);
-
-  if (!data || data.length === 0) return nickname;
-
-  for (let i = 1; i <= 99; i++) {
-    const suffix = `${i}`;
-    const candidate = nickname.length + suffix.length > 12
-      ? nickname.slice(0, 12 - suffix.length) + suffix
-      : nickname + suffix;
-
-    const { data: dup } = await sb.from('profiles')
-      .select('id')
-      .ilike('nickname', candidate)
-      .neq('id', userId)
-      .limit(1);
-
-    if (!dup || dup.length === 0) return candidate;
-  }
-
-  return nickname + Math.floor(Math.random() * 1000);
-}
-
-export async function updateProfile(profile: LocalProfile): Promise<void> {
-  saveLocalProfile(profile);
-
-  const sb = getSupabase();
-  if (!sb || !supabaseUserId) return;
-
-  await sb.from('profiles').update({
-    nickname: profile.nickname,
-    country_code: profile.country_code,
-  }).eq('id', supabaseUserId);
 }
