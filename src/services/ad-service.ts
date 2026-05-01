@@ -92,8 +92,10 @@ export async function hideBanner(): Promise<void> {
   }
 }
 
-// -- Interstitial (전면광고: 빈도 제한은 AdMob 대시보드 설정에 위임) --
+// -- Interstitial (전면광고: 5회 게임오버마다 1회) --
 let interstitialReady = false;
+let gameOverCount = 0;
+const INTERSTITIAL_INTERVAL = 5;
 
 async function preloadInterstitial(): Promise<void> {
   if (!initialized || !AdMobPlugin) return;
@@ -106,7 +108,10 @@ async function preloadInterstitial(): Promise<void> {
 }
 
 export async function showInterstitialOnGameOver(): Promise<void> {
-  if (!initialized || !AdMobPlugin || adsRemoved || !interstitialReady) return;
+  if (!initialized || !AdMobPlugin || adsRemoved) return;
+  gameOverCount++;
+  if (gameOverCount % INTERSTITIAL_INTERVAL !== 0) return;
+  if (!interstitialReady) return;
   try {
     await AdMobPlugin.showInterstitial();
     interstitialReady = false;
