@@ -7,8 +7,8 @@ import { Capacitor } from '@capacitor/core';
 const isNative = Capacitor.isNativePlatform();
 
 // -- AdMob Ad IDs --
-const BANNER_ID = 'ca-app-pub-7981513411030364/4476498218';
-const INTERSTITIAL_ID = 'ca-app-pub-7981513411030364/5765432109';
+const BANNER_ID = 'ca-app-pub-7981513411030364/2625630118';
+const INTERSTITIAL_ID = 'ca-app-pub-7981513411030364/7579597996';
 const REWARD_ID = 'ca-app-pub-7981513411030364/9888712896';
 
 // -- Dynamic import --
@@ -60,22 +60,38 @@ export async function initAds(): Promise<void> {
 }
 
 function setupEventListeners(): void {
-  if (!AdMobPlugin || !RewardAdEvents) return;
+  if (!AdMobPlugin || !RewardAdEvents || !BannerAdEvents) return;
 
   AdMobPlugin.addListener(RewardAdEvents.Loaded, () => { rewardedReady = true; });
   AdMobPlugin.addListener(RewardAdEvents.FailedToLoad, () => { rewardedReady = false; });
+
+  // 배너 크기 변경 시 body 패딩 조정 (게임 화면과 겹침 방지)
+  AdMobPlugin.addListener(BannerAdEvents.SizeChanged, (size: any) => {
+    const height = size?.height ?? 0;
+    document.body.style.paddingBottom = height > 0 ? `${height}px` : '0px';
+    window.dispatchEvent(new Event('resize'));
+  });
 }
 
-// -- Banner (상점 화면 전용) --
+// -- Banner --
+let bannerCreated = false;
+
 export async function showBanner(): Promise<void> {
   if (!initialized || !AdMobPlugin || bannerShowing || adsRemoved) return;
   try {
-    await AdMobPlugin.showBanner({
-      adId: BANNER_ID,
-      adSize: BannerAdSizeEnum?.BANNER ?? 'BANNER',
-      position: BannerAdPositionEnum?.BOTTOM_CENTER ?? 'BOTTOM_CENTER',
-      margin: 0,
-    });
+    if (bannerCreated) {
+      // 숨긴 배너 다시 표시
+      await AdMobPlugin.resumeBanner();
+    } else {
+      // 최초 배너 생성
+      await AdMobPlugin.showBanner({
+        adId: BANNER_ID,
+        adSize: BannerAdSizeEnum?.ADAPTIVE_BANNER ?? 'ADAPTIVE_BANNER',
+        position: BannerAdPositionEnum?.BOTTOM_CENTER ?? 'BOTTOM_CENTER',
+        margin: 0,
+      });
+      bannerCreated = true;
+    }
     bannerShowing = true;
   } catch (e) {
     console.warn('[AdService] 배너 표시 실패:', e);
@@ -87,15 +103,19 @@ export async function hideBanner(): Promise<void> {
   try {
     await AdMobPlugin.hideBanner();
     bannerShowing = false;
+    document.body.style.paddingBottom = '0px';
+    window.dispatchEvent(new Event('resize'));
   } catch {
     bannerShowing = false;
+    document.body.style.paddingBottom = '0px';
+    window.dispatchEvent(new Event('resize'));
   }
 }
 
 // -- Interstitial (전면광고: 5회 게임오버마다 1회) --
 let interstitialReady = false;
 let gameOverCount = 0;
-const INTERSTITIAL_INTERVAL = 5;
+const INTERSTITIAL_INTERVAL = 10;
 
 async function preloadInterstitial(): Promise<void> {
   if (!initialized || !AdMobPlugin) return;
