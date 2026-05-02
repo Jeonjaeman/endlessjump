@@ -67,7 +67,14 @@ export async function flushQueue(): Promise<void> {
       });
 
       if (error) {
-        remaining.push(entry);
+        // 중복 레코드(23505 또는 409)는 이미 저장된 것 → 재시도 없이 버림
+        const isDuplicate = error.code === '23505'
+          || (error as any).status === 409
+          || error.message?.includes('duplicate')
+          || error.message?.includes('conflict');
+        if (!isDuplicate) {
+          remaining.push(entry);
+        }
       }
     } catch {
       remaining.push(entry);

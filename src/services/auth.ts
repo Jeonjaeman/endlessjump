@@ -181,7 +181,7 @@ async function upsertGoogleProfile(displayName: string, countryCode: string, pho
   const { data } = await sb.from('profiles')
     .select('id')
     .eq('id', supabaseUserId)
-    .single();
+    .maybeSingle();
 
   if (data) {
     // 기존 프로필 업데이트
@@ -212,7 +212,7 @@ async function syncProfileFromDB(): Promise<void> {
   const { data } = await sb.from('profiles')
     .select('id, nickname, country_code, photo_url')
     .eq('id', supabaseUserId)
-    .single();
+    .maybeSingle();
 
   if (data) {
     const dbProfile: LocalProfile = {

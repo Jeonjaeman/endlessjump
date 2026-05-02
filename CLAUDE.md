@@ -1,5 +1,13 @@
 # EndlessJump - Claude Code 프로젝트 지침
 
+## 작업 원칙 (속도 최적화)
+
+- 직접 수정 우선. 단순 버그/기능은 에이전트 위임 없이 직접 처리한다.
+- 글로벌 rules 중 이 프로젝트에 해당하는 언어는 TypeScript, Java뿐이다. 다른 언어(Go, Rust, Python, C++, Swift, Kotlin, Perl, PHP, C#) rules는 무시한다.
+- 중국어(zh/) rules는 영어 common/의 중복이므로 무시한다.
+- 코드 리뷰, TDD, 보안 검토 등 heavyweight 프로세스는 사용자가 명시적으로 요청할 때만 수행한다.
+- 팀 에이전트 위임은 대규모 작업에만 사용한다. 파일 2-3개 수준은 직접 처리한다.
+
 ## 프로젝트 개요
 
 수직 스크롤 아케이드 게임 (TypeScript + Vite + Canvas 2D + Capacitor Android)
