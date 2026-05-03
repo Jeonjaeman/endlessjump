@@ -29,11 +29,30 @@ function loadSkinBackgrounds(skinId: string): void {
   for (const name of BG_NAMES) {
     const img = new Image();
     img.onload = () => {
-      map.set(name, img);
-      loaded++;
-      if (loaded === BG_NAMES.length) {
-        skinBgCache.set(skinId, map);
-        skinBgLoading.delete(skinId);
+      // 사전 디코딩하여 첫 drawImage 호출 시 렉 방지
+      if ('decode' in img) {
+        img.decode().then(() => {
+          map.set(name, img);
+          loaded++;
+          if (loaded === BG_NAMES.length) {
+            skinBgCache.set(skinId, map);
+            skinBgLoading.delete(skinId);
+          }
+        }).catch(() => {
+          map.set(name, img);
+          loaded++;
+          if (loaded === BG_NAMES.length) {
+            skinBgCache.set(skinId, map);
+            skinBgLoading.delete(skinId);
+          }
+        });
+      } else {
+        map.set(name, img);
+        loaded++;
+        if (loaded === BG_NAMES.length) {
+          skinBgCache.set(skinId, map);
+          skinBgLoading.delete(skinId);
+        }
       }
     };
     img.onerror = () => {

@@ -833,7 +833,38 @@ export class Game {
   private async loadRankings(): Promise<void> {
     const entries = await fetchRanking(this.rankingTab);
     this.rankings = entries.filter(e => e.rank <= 10);
-    this.myRank = entries.find(e => e.is_me && e.rank > 10) || null;
+
+    // 내 최고 기록이 top 10 밖이면 그걸 표시
+    const myBest = entries.find(e => e.is_me && e.rank > 10);
+    if (myBest) {
+      this.myRank = myBest;
+    } else {
+      // 내 최고 기록이 top 10 안에 있지만, 현재 게임 점수가 그보다 낮을 때
+      // 현재 게임 점수의 순위를 계산해서 표시
+      const currentHeight = Math.floor(this.heightReached);
+      const myInTop10 = entries.find(e => e.is_me && e.rank <= 10);
+      if (myInTop10 && currentHeight < myInTop10.height) {
+        // 현재 게임 점수가 전체 랭킹에서 몇 위인지 계산
+        const currentRank = entries.filter(e => e.height > currentHeight).length + 1;
+        if (currentRank > 10) {
+          this.myRank = {
+            rank: currentRank,
+            score: this.score,
+            height: currentHeight,
+            nickname: myInTop10.nickname,
+            country_code: myInTop10.country_code,
+            is_me: true,
+            comment: undefined,
+            skin_id: myInTop10.skin_id,
+            photo_url: myInTop10.photo_url,
+          };
+        } else {
+          this.myRank = null;
+        }
+      } else {
+        this.myRank = null;
+      }
+    }
   }
 
   private worldToScreen(worldY: number): number {
@@ -872,24 +903,33 @@ export class Game {
     requestAnimationFrame((t) => this.loop(t));
   }
 
+  // 매 프레임 객체 재생성 방지 — 단일 인스턴스 재사용
+  private _rs: RenderState = {
+    w: 0, h: 0, bunnyX: 0, bunnyY: 0, velX: 0, velY: 0, cameraY: 0,
+    score: 0, bestScore: 0, bestHeight: 0, heightReached: 0,
+    bunnyPose: 0 as any, earBounce: 0, animTime: 0,
+    scoreBounce: 1, scoreColor: '#FFF',
+    carrots: [], particles: [], clouds: [], scorePopups: [],
+    skinSprites: null, skinColors: {} as any,
+    worldToScreen: (y: number) => this.worldToScreen(y),
+    perspectiveScale: (y: number) => this.perspectiveScale(y),
+  };
+
   private getRenderState(): RenderState {
-    const self = this;
-    return {
-      w: this.w, h: this.h,
-      bunnyX: this.bunnyX, bunnyY: this.bunnyY,
-      velX: this.velX, velY: this.velY,
-      cameraY: this.cameraY,
-      score: this.score, bestScore: this.bestScore, bestHeight: this.bestHeight,
-      heightReached: this.heightReached,
-      bunnyPose: this.bunnyPose, earBounce: this.earBounce, animTime: this.animTime,
-      scoreBounce: this.scoreBounce, scoreColor: this.scoreColor,
-      carrots: this.carrots, particles: this.particles, clouds: this.clouds,
-      scorePopups: this.scorePopups,
-      skinSprites: skinAssetLoader.getCurrentSkinSprites(),
-      skinColors: getCurrentSkinColors(),
-      worldToScreen: (y: number) => self.worldToScreen(y),
-      perspectiveScale: (y: number) => self.perspectiveScale(y),
-    };
+    const rs = this._rs;
+    rs.w = this.w; rs.h = this.h;
+    rs.bunnyX = this.bunnyX; rs.bunnyY = this.bunnyY;
+    rs.velX = this.velX; rs.velY = this.velY;
+    rs.cameraY = this.cameraY;
+    rs.score = this.score; rs.bestScore = this.bestScore; rs.bestHeight = this.bestHeight;
+    rs.heightReached = this.heightReached;
+    rs.bunnyPose = this.bunnyPose; rs.earBounce = this.earBounce; rs.animTime = this.animTime;
+    rs.scoreBounce = this.scoreBounce; rs.scoreColor = this.scoreColor;
+    rs.carrots = this.carrots; rs.particles = this.particles; rs.clouds = this.clouds;
+    rs.scorePopups = this.scorePopups;
+    rs.skinSprites = skinAssetLoader.getCurrentSkinSprites();
+    rs.skinColors = getCurrentSkinColors();
+    return rs;
   }
 
   private render(): void {

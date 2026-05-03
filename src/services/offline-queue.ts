@@ -67,17 +67,12 @@ export async function flushQueue(): Promise<void> {
       });
 
       if (error) {
-        // 중복 레코드(23505 또는 409)는 이미 저장된 것 → 재시도 없이 버림
-        const isDuplicate = error.code === '23505'
-          || (error as any).status === 409
-          || error.message?.includes('duplicate')
-          || error.message?.includes('conflict');
-        if (!isDuplicate) {
-          remaining.push(entry);
-        }
+        console.warn('[Queue] flush error, discarding entry:', error.code, error.message);
+        // 모든 에러(중복, 외래키, 권한 등)는 재시도해도 같은 결과 → 버림
       }
-    } catch {
-      remaining.push(entry);
+    } catch (e) {
+      console.warn('[Queue] flush exception, discarding entry:', e);
+      // 네트워크 에러도 큐에 남기지 않음 (다음 게임에서 새로 저장됨)
     }
 
     // 1 second delay between submissions (rate limiting)

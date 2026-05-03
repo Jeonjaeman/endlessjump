@@ -128,7 +128,14 @@ class AssetManagerImpl {
   private tryLoad(src: string): Promise<HTMLImageElement | null> {
     return new Promise((resolve) => {
       const img = new Image();
-      img.onload = () => resolve(img);
+      img.onload = () => {
+        // 사전 디코딩: 첫 drawImage 시 메인 스레드 블로킹 방지
+        if ('decode' in img) {
+          img.decode().then(() => resolve(img)).catch(() => resolve(img));
+        } else {
+          resolve(img);
+        }
+      };
       img.onerror = () => resolve(null);
       img.src = src;
     });

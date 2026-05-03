@@ -17,7 +17,7 @@ import type { BunnySkin, Achievement } from '../types';
 
 // ── 상점 상태 ───────────────────────────────────────────────
 let shopOpen = false;
-let shopTab: 'items' | 'skins' | 'achievements' = 'items';
+let shopTab: 'items' | 'skins' | 'achievements' = 'skins';
 let skinsScrollY = 0;
 let shopDragStartY = -1;
 let shopDragScrollStart = 0;
@@ -49,7 +49,7 @@ export function handleShopPointerUp(): void {
 
 export function openShop(): void {
   shopOpen = true;
-  shopTab = 'items';
+  shopTab = 'skins';
   skinsScrollY = 0;
 
   // 스킨 썸네일 프리로드
@@ -102,8 +102,8 @@ export function handleShopTap(x: number, y: number): boolean {
     return true;
   }
 
-  // 탭 전환
-  if (hitTest(x, y, tabAreas.items)) { shopTab = 'items'; return true; }
+  // 탭 전환 (items 탭 임시 비활성화)
+  // if (hitTest(x, y, tabAreas.items)) { shopTab = 'items'; return true; }
   if (hitTest(x, y, tabAreas.skins)) { shopTab = 'skins'; return true; }
   if (hitTest(x, y, tabAreas.achievements)) { shopTab = 'achievements'; return true; }
 
@@ -209,10 +209,10 @@ export function renderShop(ctx: CanvasRenderingContext2D, w: number, h: number):
 
   // 탭 버튼
   const tabY = panelY + 70;
-  const tabW = (panelW - 40) / 3;
+  const tabW = (panelW - 40) / 2;
   const tabH = 30;
   const tabs: Array<{ key: typeof shopTab; label: string }> = [
-    { key: 'items', label: '아이템' },
+    // { key: 'items', label: '아이템' },  // 광고 제거 탭 임시 숨김
     { key: 'skins', label: '스킨' },
     { key: 'achievements', label: '업적' },
   ];

@@ -69,17 +69,36 @@ export async function initAuth(): Promise<string | null> {
   if (!sb) return null;
 
   try {
+    // OAuth 리다이렉트 콜백 처리 (웹에서 Google 로그인 후 돌아왔을 때)
+    if (window.location.hash.includes('access_token') || window.location.search.includes('code=')) {
+      // Supabase가 URL에서 토큰을 자동 추출하도록 대기
+      await new Promise<void>((resolve) => {
+        const { data: { subscription } } = sb.auth.onAuthStateChange((event) => {
+          if (event === 'SIGNED_IN') {
+            subscription.unsubscribe();
+            resolve();
+          }
+        });
+        // 3초 타임아웃 (이미 처리됐거나 실패한 경우)
+        setTimeout(() => { subscription.unsubscribe(); resolve(); }, 3000);
+      });
+      // URL 정리
+      history.replaceState(null, '', window.location.pathname);
+    }
+
     // Check existing session (Google or anonymous)
     const { data: { session } } = await sb.auth.getSession();
     if (session?.user) {
       supabaseUserId = session.user.id;
       supabaseUserEmail = session.user.email ?? null;
       // Google 연결 상태 감지
-      if (session.user.app_metadata?.provider === 'google'
-          || (session.user.identities ?? []).some((i: any) => i.provider === 'google')) {
+      const isGoogle = session.user.app_metadata?.provider === 'google'
+          || (session.user.identities ?? []).some((i: any) => i.provider === 'google');
+      if (isGoogle) {
         localStorage.setItem(LINKED_KEY, '1');
       }
-      await syncProfileFromDB();
+      // 모든 유저(Google/익명)에 대해 프로필 보장
+      await ensureProfileExists(session.user);
       flushQueue();
       return supabaseUserId;
     }
@@ -111,7 +130,7 @@ export async function initAuth(): Promise<string | null> {
 
     supabaseUserId = data.user.id;
     supabaseUserEmail = data.user.email ?? null;
-    await syncProfileFromDB();
+    await ensureProfileExists(data.user);
     flushQueue();
     return supabaseUserId;
   } catch {
@@ -200,6 +219,44 @@ async function upsertGoogleProfile(displayName: string, countryCode: string, pho
       local_uuid: getLocalUUID(),
     });
   }
+}
+
+/**
+ * Google 유저의 프로필이 없으면 자동 생성
+ */
+async function ensureProfileExists(user: any): Promise<void> {
+  const sb = getSupabase();
+  if (!sb || !supabaseUserId) return;
+
+  const { data } = await sb.from('profiles')
+    .select('id')
+    .eq('id', supabaseUserId)
+    .maybeSingle();
+
+  if (data) {
+    // 이미 존재 → 로컬에 동기화
+    await syncProfileFromDB();
+    return;
+  }
+
+  // 프로필 생성 (Google 메타데이터에서 정보 추출)
+  const nickname = user.user_metadata?.full_name || user.user_metadata?.name || 'Player';
+  const photoUrl = user.user_metadata?.avatar_url || null;
+  const profile: LocalProfile = {
+    nickname,
+    country_code: getLocalProfile().country_code,
+    photo_url: photoUrl ?? undefined,
+  };
+  saveLocalProfile(profile);
+  localStorage.setItem('bh_profile_set', '1');
+
+  await sb.from('profiles').insert({
+    id: supabaseUserId,
+    nickname: profile.nickname,
+    country_code: profile.country_code,
+    photo_url: photoUrl,
+    local_uuid: getLocalUUID(),
+  });
 }
 
 /**
