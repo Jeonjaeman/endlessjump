@@ -169,11 +169,124 @@ function getRowHeight(entry: RankEntry): number {
 }
 
 export function getRankingMaxScroll(rankings: RankEntry[], myRank: RankEntry | null): number {
-  const top10 = rankings.filter(r => r.rank <= 10);
-  let totalH = 0;
-  for (const e of top10) totalH += getRowHeight(e);
-  if (myRank && myRank.rank > 10) totalH += getRowHeight(myRank) + 20;
-  return Math.max(0, totalH - LIST_CLIP_H);
+  const inTop10 = !myRank || myRank.rank <= 10;
+  if (inTop10) {
+    const top10 = rankings.filter(r => r.rank <= 10);
+    let totalH = 0;
+    for (const e of top10) totalH += getRowHeight(e);
+    return Math.max(0, totalH - LIST_CLIP_H);
+  } else {
+    // 축소 뷰: 1위 + 구분선 + 10위 + 구분선 + 내 순위
+    const first = rankings.find(r => r.rank === 1);
+    const tenth = rankings.find(r => r.rank === 10);
+    let totalH = 0;
+    if (first) totalH += getRowHeight(first);
+    totalH += 30; // 구분선 (...)
+    if (tenth) totalH += getRowHeight(tenth);
+    totalH += 30; // 구분선
+    totalH += getRowHeight(myRank);
+    return Math.max(0, totalH - LIST_CLIP_H);
+  }
+}
+
+// ── 개별 순위 행 렌더링 ─────────────────────────────────────────
+
+function drawRankRow(
+  ctx: CanvasRenderingContext2D,
+  entry: RankEntry,
+  listX: number, listW: number, curY: number,
+  forceHighlight: boolean = false,
+): number {
+  const isTop3 = entry.rank >= 1 && entry.rank <= 3;
+  const medalIdx = entry.rank - 1;
+  const hasComment = !!entry.comment;
+  const thisRowH = ROW_H + (hasComment ? COMMENT_H : 0);
+  const highlight = forceHighlight || entry.is_me;
+
+  if (isTop3) {
+    drawNeoRect(ctx, listX, curY - 6, listW, thisRowH + 4, 8, MEDAL_BG[medalIdx], 3);
+
+    const rowCenterY = curY + 16;
+
+    ctx.font = '16px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(MEDAL_EMOJIS[medalIdx], listX + 8, rowCenterY + 1);
+
+    const flag3 = getFlagEmoji(entry.country_code);
+    ctx.font = '14px sans-serif';
+    ctx.fillText(flag3, listX + 30, rowCenterY + 1);
+
+    drawSkinDot(ctx, listX + 58, rowCenterY - 3, 10, entry.skin_id);
+
+    const photo3 = getProfilePhoto(entry.photo_url);
+    if (photo3) {
+      drawCircleImage(ctx, photo3, listX + 82, rowCenterY - 3, 10);
+    }
+    const nameX3 = photo3 ? listX + 98 : listX + 74;
+
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillStyle = highlight ? '#FF6B35' : '#1a1a2e';
+    ctx.textAlign = 'left';
+    ctx.fillText(entry.nickname, nameX3, rowCenterY + 1);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#1a1a2e';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillText(`${entry.height}mm`, listX + listW - 10, rowCenterY + 1);
+
+    if (hasComment) {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.font = 'italic 12px sans-serif';
+      const truncated = entry.comment!.length > 30 ? entry.comment!.slice(0, 30) + '\u2026' : entry.comment!;
+      ctx.fillText('\uD83D\uDCAC ' + truncated, listX + 12, curY + ROW_H + 2);
+    }
+  } else {
+    if (highlight) {
+      drawNeoRect(ctx, listX, curY - 6, listW, thisRowH + 4, 6, 'rgba(255,107,53,0.85)', 2);
+    } else {
+      drawNeoRect(ctx, listX, curY - 6, listW, thisRowH + 4, 6, 'rgba(30,30,50,0.75)', 2);
+    }
+
+    const rowCenterY2 = curY + 16;
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = highlight ? '#FFF' : 'rgba(255,255,255,0.7)';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillText(`${entry.rank}`, listX + 8, rowCenterY2);
+
+    const flagR = getFlagEmoji(entry.country_code);
+    ctx.font = '13px sans-serif';
+    ctx.fillText(flagR, listX + 30, rowCenterY2);
+
+    drawSkinDot(ctx, listX + 56, rowCenterY2 - 4, 9, entry.skin_id);
+
+    const photoR = getProfilePhoto(entry.photo_url);
+    if (photoR) {
+      drawCircleImage(ctx, photoR, listX + 78, rowCenterY2 - 4, 9);
+    }
+    const nameXR = photoR ? listX + 92 : listX + 70;
+
+    ctx.font = 'bold 13px sans-serif';
+    ctx.fillStyle = highlight ? '#FFF' : '#FFFFFF';
+    ctx.textAlign = 'left';
+    ctx.fillText(entry.nickname, nameXR, rowCenterY2);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = highlight ? '#FFD700' : 'rgba(255,255,255,0.85)';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillText(`${entry.height}mm`, listX + listW - 10, rowCenterY2);
+
+    if (hasComment) {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = highlight ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.45)';
+      ctx.font = 'italic 12px sans-serif';
+      const truncated = entry.comment!.length > 30 ? entry.comment!.slice(0, 30) + '\u2026' : entry.comment!;
+      ctx.fillText('\uD83D\uDCAC ' + truncated, listX + 12, curY + ROW_H);
+    }
+  }
+
+  return curY + thisRowH + ROW_GAP;
 }
 
 // ── 메인 렌더링 ────────────────────────────────────────────────
@@ -245,6 +358,7 @@ export function renderRankingScreen(
   ctx.textAlign = 'right';
   ctx.fillText('Height', listX + listW - 8, listY);
 
+  const inTop10 = !myRank || myRank.rank <= 10;
   const top10 = rankings.filter(r => r.rank <= 10);
 
   // 클립 영역
@@ -256,167 +370,44 @@ export function renderRankingScreen(
 
   let curY = listY + 14;
 
-  for (let i = 0; i < top10.length; i++) {
-    const entry = top10[i];
-    const isTop3 = entry.rank >= 1 && entry.rank <= 3;
-    const medalIdx = entry.rank - 1;
-    const hasComment = !!entry.comment;
-    const thisRowH = ROW_H + (hasComment ? COMMENT_H : 0);
+  if (inTop10) {
+    // ── TOP 10 진입: 전체 리스트 표시 ──
+    for (let i = 0; i < top10.length; i++) {
+      curY = drawRankRow(ctx, top10[i], listX, listW, curY);
+    }
+  } else {
+    // ── TOP 10 밖: 1위, ..., 10위, ..., 내 순위만 표시 ──
+    const first = top10.find(r => r.rank === 1);
+    const tenth = top10.find(r => r.rank === 10);
 
-    if (isTop3) {
-      // TOP 3: Neobrutalism medal card
-      drawNeoRect(ctx, listX, curY - 6, listW, thisRowH + 4, 8, MEDAL_BG[medalIdx], 3);
-
-      const rowCenterY = curY + 16;
-
-      // 메달 이모지
-      ctx.font = '16px sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText(MEDAL_EMOJIS[medalIdx], listX + 8, rowCenterY + 1);
-
-      // 국가
-      const flag3 = getFlagEmoji(entry.country_code);
-      ctx.font = '14px sans-serif';
-      ctx.fillText(flag3, listX + 30, rowCenterY + 1);
-
-      // 스킨 닷
-      drawSkinDot(ctx, listX + 58, rowCenterY - 3, 10, entry.skin_id);
-
-      // 프로필 사진
-      const photo3 = getProfilePhoto(entry.photo_url);
-      if (photo3) {
-        drawCircleImage(ctx, photo3, listX + 82, rowCenterY - 3, 10);
-      }
-      const nameX3 = photo3 ? listX + 98 : listX + 74;
-
-      // 구글 계정명
-      ctx.font = 'bold 14px sans-serif';
-      ctx.fillStyle = entry.is_me ? '#FF6B35' : '#1a1a2e';
-      ctx.textAlign = 'left';
-      ctx.fillText(entry.nickname, nameX3, rowCenterY + 1);
-
-      // 높이
-      ctx.textAlign = 'right';
-      ctx.fillStyle = '#1a1a2e';
-      ctx.font = 'bold 14px sans-serif';
-      ctx.fillText(`${entry.height}mm`, listX + listW - 10, rowCenterY + 1);
-
-      // 댓글
-      if (hasComment) {
-        ctx.textAlign = 'left';
-        ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.font = 'italic 12px sans-serif';
-        const truncated = entry.comment!.length > 30 ? entry.comment!.slice(0, 30) + '\u2026' : entry.comment!;
-        ctx.fillText('\uD83D\uDCAC ' + truncated, listX + 12, curY + ROW_H + 2);
-      }
-
-    } else {
-      // 4위 이하
-      if (entry.is_me) {
-        drawNeoRect(ctx, listX, curY - 6, listW, thisRowH + 4, 6, 'rgba(255,107,53,0.85)', 2);
-      } else {
-        drawNeoRect(ctx, listX, curY - 6, listW, thisRowH + 4, 6, 'rgba(30,30,50,0.75)', 2);
-      }
-
-      const rowCenterY2 = curY + 16;
-
-      ctx.textAlign = 'left';
-      ctx.fillStyle = entry.is_me ? '#FFF' : 'rgba(255,255,255,0.7)';
-      ctx.font = 'bold 14px sans-serif';
-      const rankText = `${entry.rank}`;
-      ctx.fillText(rankText, listX + 8, rowCenterY2);
-
-      // 국가
-      const flagR = getFlagEmoji(entry.country_code);
-      ctx.font = '13px sans-serif';
-      ctx.fillText(flagR, listX + 30, rowCenterY2);
-
-      // 스킨 닷
-      drawSkinDot(ctx, listX + 56, rowCenterY2 - 4, 9, entry.skin_id);
-
-      // 프로필 사진
-      const photoR = getProfilePhoto(entry.photo_url);
-      if (photoR) {
-        drawCircleImage(ctx, photoR, listX + 78, rowCenterY2 - 4, 9);
-      }
-      const nameXR = photoR ? listX + 92 : listX + 70;
-
-      // 구글 계정명
-      ctx.font = 'bold 13px sans-serif';
-      ctx.fillStyle = entry.is_me ? '#FFF' : '#FFFFFF';
-      ctx.textAlign = 'left';
-      ctx.fillText(entry.nickname, nameXR, rowCenterY2);
-
-      ctx.textAlign = 'right';
-      ctx.fillStyle = entry.is_me ? '#FFD700' : 'rgba(255,255,255,0.85)';
-      ctx.font = 'bold 14px sans-serif';
-      ctx.fillText(`${entry.height}mm`, listX + listW - 10, rowCenterY2);
-
-      if (hasComment) {
-        ctx.textAlign = 'left';
-        ctx.fillStyle = 'rgba(255,255,255,0.45)';
-        ctx.font = 'italic 12px sans-serif';
-        const truncated = entry.comment!.length > 30 ? entry.comment!.slice(0, 30) + '\u2026' : entry.comment!;
-        ctx.fillText('\uD83D\uDCAC ' + truncated, listX + 12, curY + ROW_H);
-      }
+    // 1위
+    if (first) {
+      curY = drawRankRow(ctx, first, listX, listW, curY);
     }
 
-    curY += thisRowH + ROW_GAP;
-  }
-
-  // My rank if outside top 10
-  if (myRank && myRank.rank > 10) {
-    curY += 8;
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.fillRect(listX, curY - 4, listW, 1);
-    curY += 8;
-
-    const hasComment = !!myRank.comment;
-    const thisRowH = ROW_H + (hasComment ? COMMENT_H : 0);
-
-    drawNeoRect(ctx, listX, curY - 6, listW, thisRowH + 4, 6, 'rgba(255,107,53,0.85)', 2);
-
-    const myRowCenterY = curY + 16;
-
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#FFF';
+    // 구분선 (...)
+    curY += 4;
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.font = 'bold 14px sans-serif';
-    const myRankText = `${myRank.rank}`;
-    ctx.fillText(myRankText, listX + 8, myRowCenterY);
+    ctx.textAlign = 'center';
+    ctx.fillText('\u22EE', listX + listW / 2, curY + 8);
+    curY += 22;
 
-    // 국가
-    const myFlag = getFlagEmoji(myRank.country_code);
-    ctx.font = '13px sans-serif';
-    ctx.fillText(myFlag, listX + 30, myRowCenterY);
-
-    // 스킨 닷
-    drawSkinDot(ctx, listX + 56, myRowCenterY - 4, 9, myRank.skin_id);
-
-    // 프로필 사진
-    const myPhoto = getProfilePhoto(myRank.photo_url);
-    if (myPhoto) {
-      drawCircleImage(ctx, myPhoto, listX + 78, myRowCenterY - 4, 9);
+    // 10위
+    if (tenth) {
+      curY = drawRankRow(ctx, tenth, listX, listW, curY);
     }
-    const myNameX = myPhoto ? listX + 92 : listX + 70;
 
-    // 구글 계정명
-    ctx.font = 'bold 13px sans-serif';
-    ctx.fillStyle = '#FFF';
-    ctx.textAlign = 'left';
-    ctx.fillText(myRank.nickname, myNameX, myRowCenterY);
-
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#FFD700';
+    // 구분선
+    curY += 4;
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.font = 'bold 14px sans-serif';
-    ctx.fillText(`${myRank.height}mm`, listX + listW - 10, myRowCenterY);
+    ctx.textAlign = 'center';
+    ctx.fillText('\u22EE', listX + listW / 2, curY + 8);
+    curY += 22;
 
-    if (hasComment) {
-      ctx.textAlign = 'left';
-      ctx.fillStyle = 'rgba(255,255,255,0.55)';
-      ctx.font = 'italic 12px sans-serif';
-      const truncated = myRank.comment!.length > 30 ? myRank.comment!.slice(0, 30) + '\u2026' : myRank.comment!;
-      ctx.fillText('\uD83D\uDCAC ' + truncated, listX + 12, curY + ROW_H);
-    }
+    // 내 순위
+    drawRankRow(ctx, myRank, listX, listW, curY, true);
   }
 
   ctx.restore();
