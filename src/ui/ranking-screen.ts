@@ -169,24 +169,18 @@ function getRowHeight(entry: RankEntry): number {
 }
 
 export function getRankingMaxScroll(rankings: RankEntry[], myRank: RankEntry | null): number {
+  const top10 = rankings.filter(r => r.rank <= 10);
+  let totalH = 0;
+  for (const e of top10) totalH += getRowHeight(e);
+
+  // TOP 10 밖이면 구분선 + 내 순위 행 추가
   const inTop10 = !myRank || myRank.rank <= 10;
-  if (inTop10) {
-    const top10 = rankings.filter(r => r.rank <= 10);
-    let totalH = 0;
-    for (const e of top10) totalH += getRowHeight(e);
-    return Math.max(0, totalH - LIST_CLIP_H);
-  } else {
-    // 축소 뷰: 1위 + 구분선 + 10위 + 구분선 + 내 순위
-    const first = rankings.find(r => r.rank === 1);
-    const tenth = rankings.find(r => r.rank === 10);
-    let totalH = 0;
-    if (first) totalH += getRowHeight(first);
-    totalH += 30; // 구분선 (...)
-    if (tenth) totalH += getRowHeight(tenth);
-    totalH += 30; // 구분선
+  if (!inTop10 && myRank) {
+    totalH += 26; // 구분선 (⋮)
     totalH += getRowHeight(myRank);
-    return Math.max(0, totalH - LIST_CLIP_H);
   }
+
+  return Math.max(0, totalH - LIST_CLIP_H);
 }
 
 // ── 개별 순위 행 렌더링 ─────────────────────────────────────────
