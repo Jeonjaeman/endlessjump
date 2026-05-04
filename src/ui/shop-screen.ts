@@ -318,7 +318,7 @@ function renderItemsTab(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
     ctx.fillStyle = '#FFF';
     ctx.font = 'bold 12px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('₩3,300', btnX + btnW / 2, btnY + btnH / 2 + 4);
+    ctx.fillText('₩5,500', btnX + btnW / 2, btnY + btnH / 2 + 4);
 
     itemButtonAreas.push({
       id: 'endlessjump_remove_ads',

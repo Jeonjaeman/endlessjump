@@ -370,22 +370,13 @@ export function renderRankingScreen(
 
   let curY = listY + 14;
 
-  if (inTop10) {
-    // ── TOP 10 진입: 전체 리스트 표시 ──
-    for (let i = 0; i < top10.length; i++) {
-      curY = drawRankRow(ctx, top10[i], listX, listW, curY);
-    }
-  } else {
-    // ── TOP 10 밖: 1위, ..., 10위, ..., 내 순위만 표시 ──
-    const first = top10.find(r => r.rank === 1);
-    const tenth = top10.find(r => r.rank === 10);
+  // ── TOP 10 리스트 표시 ──
+  for (let i = 0; i < top10.length; i++) {
+    curY = drawRankRow(ctx, top10[i], listX, listW, curY);
+  }
 
-    // 1위
-    if (first) {
-      curY = drawRankRow(ctx, first, listX, listW, curY);
-    }
-
-    // 구분선 (...)
+  // ── TOP 10 밖이면 구분선 + 내 순위 추가 표시 ──
+  if (!inTop10 && myRank) {
     curY += 4;
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.font = 'bold 14px sans-serif';
@@ -393,20 +384,6 @@ export function renderRankingScreen(
     ctx.fillText('\u22EE', listX + listW / 2, curY + 8);
     curY += 22;
 
-    // 10위
-    if (tenth) {
-      curY = drawRankRow(ctx, tenth, listX, listW, curY);
-    }
-
-    // 구분선
-    curY += 4;
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.font = 'bold 14px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('\u22EE', listX + listW / 2, curY + 8);
-    curY += 22;
-
-    // 내 순위
     drawRankRow(ctx, myRank, listX, listW, curY, true);
   }
 

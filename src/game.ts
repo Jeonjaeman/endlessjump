@@ -832,7 +832,7 @@ export class Game {
 
   private async loadRankings(): Promise<void> {
     const entries = await fetchRanking(this.rankingTab);
-    this.rankings = entries.filter(e => e.rank <= 10);
+    this.rankings = entries;
 
     // 내 최고 기록이 top 10 밖이면 그걸 표시
     const myBest = entries.find(e => e.is_me && e.rank > 10);
@@ -844,7 +844,6 @@ export class Game {
       const currentHeight = Math.floor(this.heightReached);
       const myInTop10 = entries.find(e => e.is_me && e.rank <= 10);
       if (myInTop10 && currentHeight < myInTop10.height) {
-        // 현재 게임 점수가 전체 랭킹에서 몇 위인지 계산
         const currentRank = entries.filter(e => e.height > currentHeight).length + 1;
         if (currentRank > 10) {
           this.myRank = {

@@ -55,7 +55,6 @@ export async function flushQueue(): Promise<void> {
   if (queue.length === 0) return;
 
   flushing = true;
-  const remaining: QueuedScore[] = [];
 
   for (const entry of queue) {
     try {
@@ -68,17 +67,15 @@ export async function flushQueue(): Promise<void> {
 
       if (error) {
         console.warn('[Queue] flush error, discarding entry:', error.code, error.message);
-        // 모든 에러(중복, 외래키, 권한 등)는 재시도해도 같은 결과 → 버림
       }
     } catch (e) {
       console.warn('[Queue] flush exception, discarding entry:', e);
-      // 네트워크 에러도 큐에 남기지 않음 (다음 게임에서 새로 저장됨)
     }
 
     // 1 second delay between submissions (rate limiting)
     await new Promise(r => setTimeout(r, 1000));
   }
 
-  writeQueue(remaining);
+  writeQueue([]);
   flushing = false;
 }
