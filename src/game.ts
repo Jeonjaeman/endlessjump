@@ -832,35 +832,27 @@ export class Game {
     const entries = await fetchRanking(this.rankingTab);
     this.rankings = entries;
 
-    // 내 최고 기록이 top 10 밖이면 그걸 표시
-    const myBest = entries.find(e => e.is_me && e.rank > 10);
-    if (myBest) {
-      this.myRank = myBest;
+    // 현재 게임 점수의 순위를 항상 계산해서 표시
+    const currentHeight = Math.floor(this.heightReached);
+    const myEntry = entries.find(e => e.is_me);
+
+    if (myEntry && currentHeight < myEntry.height) {
+      // 현재 게임이 내 최고 기록보다 낮음 → 현재 게임 순위 계산
+      const currentRank = entries.filter(e => e.height > currentHeight).length + 1;
+      this.myRank = {
+        rank: currentRank,
+        score: this.score,
+        height: currentHeight,
+        nickname: myEntry.nickname,
+        country_code: myEntry.country_code,
+        is_me: true,
+        comment: undefined,
+        skin_id: myEntry.skin_id,
+        photo_url: myEntry.photo_url,
+      };
     } else {
-      // 내 최고 기록이 top 10 안에 있지만, 현재 게임 점수가 그보다 낮을 때
-      // 현재 게임 점수의 순위를 계산해서 표시
-      const currentHeight = Math.floor(this.heightReached);
-      const myInTop10 = entries.find(e => e.is_me && e.rank <= 10);
-      if (myInTop10 && currentHeight < myInTop10.height) {
-        const currentRank = entries.filter(e => e.height > currentHeight).length + 1;
-        if (currentRank > 10) {
-          this.myRank = {
-            rank: currentRank,
-            score: this.score,
-            height: currentHeight,
-            nickname: myInTop10.nickname,
-            country_code: myInTop10.country_code,
-            is_me: true,
-            comment: undefined,
-            skin_id: myInTop10.skin_id,
-            photo_url: myInTop10.photo_url,
-          };
-        } else {
-          this.myRank = null;
-        }
-      } else {
-        this.myRank = null;
-      }
+      // 현재 게임이 최고 기록이거나 내 기록이 없음 → TOP 10 리스트에서 표시됨
+      this.myRank = null;
     }
   }
 
@@ -1130,7 +1122,7 @@ export class Game {
   }
 
   private renderGameOverScreen(ctx: CanvasRenderingContext2D): void {
-    this.rankingMaxScroll = getRankingMaxScroll(this.rankings, this.myRank);
+    this.rankingMaxScroll = getRankingMaxScroll(this.rankings, this.myRank, this.h);
     renderRankingScreen(
       ctx, this.w, this.h,
       this.rankings, this.myRank, this.rankingTab,

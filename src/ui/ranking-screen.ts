@@ -12,7 +12,7 @@ const MEDAL_SHADOW = ['#CC9900', '#8888AA', '#B07030'];
 const ROW_H = 46;
 const COMMENT_H = 22;
 const ROW_GAP = 6;
-const LIST_CLIP_H = 360;
+const LIST_BOTTOM_MARGIN = 55; // "Tap to Restart" + 여유
 
 // ── 프로필 사진 캐시 ──────────────────────────────────────────
 const photoCache = new Map<string, HTMLImageElement | null>();
@@ -168,19 +168,27 @@ function getRowHeight(entry: RankEntry): number {
   return ROW_H + (entry.comment ? COMMENT_H : 0) + ROW_GAP;
 }
 
-export function getRankingMaxScroll(rankings: RankEntry[], myRank: RankEntry | null): number {
+export function getRankingMaxScroll(rankings: RankEntry[], myRank: RankEntry | null, screenH: number = 800): number {
+  const clipH = getListClipH(screenH);
   const top10 = rankings.filter(r => r.rank <= 10);
   let totalH = 0;
   for (const e of top10) totalH += getRowHeight(e);
 
-  // TOP 10 밖이면 구분선 + 내 순위 행 추가
-  const inTop10 = !myRank || myRank.rank <= 10;
-  if (!inTop10 && myRank) {
+  // 현재 게임 순위가 있으면 구분선 + 내 순위 행 추가
+  if (myRank) {
     totalH += 26; // 구분선 (⋮)
     totalH += getRowHeight(myRank);
   }
 
-  return Math.max(0, totalH - LIST_CLIP_H);
+  return Math.max(0, totalH + 20 - clipH); // +20: 마지막 행 하단 여백
+}
+
+function getListClipH(screenH: number): number {
+  const safeTop = 40;
+  const contentH = 500;
+  const startY = Math.max(safeTop, (screenH - contentH) / 2);
+  const listY = startY + 164; // tabY offset + tabH + gap
+  return screenH - listY - LIST_BOTTOM_MARGIN;
 }
 
 // ── 개별 순위 행 렌더링 ─────────────────────────────────────────
@@ -352,25 +360,37 @@ export function renderRankingScreen(
   ctx.textAlign = 'right';
   ctx.fillText('Height', listX + listW - 8, listY);
 
-  const inTop10 = !myRank || myRank.rank <= 10;
   const top10 = rankings.filter(r => r.rank <= 10);
 
   // 클립 영역
+  const listClipH = getListClipH(h);
   ctx.save();
   ctx.beginPath();
-  ctx.rect(listX - 6, listY + 2, listW + 12, LIST_CLIP_H);
+  ctx.rect(listX - 6, listY + 2, listW + 12, listClipH);
   ctx.clip();
   ctx.translate(0, -scrollY);
 
   let curY = listY + 14;
 
-  // ── TOP 10 리스트 표시 ──
+  // ── TOP 10 리스트 + 현재 게임 순위 표시 ──
+  const myRankInTop10 = myRank && myRank.rank <= 10;
+  let myRankInserted = false;
+
   for (let i = 0; i < top10.length; i++) {
+    // 현재 게임 순위가 TOP 10 안이면 올바른 위치에 삽입
+    if (myRankInTop10 && !myRankInserted && myRank!.rank <= top10[i].rank) {
+      curY = drawRankRow(ctx, myRank!, listX, listW, curY, true);
+      myRankInserted = true;
+    }
     curY = drawRankRow(ctx, top10[i], listX, listW, curY);
   }
+  // 현재 게임 순위가 TOP 10 마지막보다 뒤면 여기서 삽입
+  if (myRankInTop10 && !myRankInserted && myRank) {
+    curY = drawRankRow(ctx, myRank, listX, listW, curY, true);
+  }
 
-  // ── TOP 10 밖이면 구분선 + 내 순위 추가 표시 ──
-  if (!inTop10 && myRank) {
+  // ── TOP 10 밖이면 구분선 + 내 순위 ──
+  if (myRank && !myRankInTop10) {
     curY += 4;
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.font = 'bold 14px sans-serif';
@@ -384,11 +404,11 @@ export function renderRankingScreen(
   ctx.restore();
 
   // 스크롤 힌트
-  if (getRankingMaxScroll(rankings, myRank) > 0) {
+  if (getRankingMaxScroll(rankings, myRank, h) > 0) {
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('\u25BC \uC2A4\uD06C\uB864', cx, listY + LIST_CLIP_H + 12);
+    ctx.fillText('\u25BC \uC2A4\uD06C\uB864', cx, listY + listClipH + 12);
   }
 
   // Revive button (Neobrutalism)
